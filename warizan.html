@@ -220,7 +220,13 @@
             justify-content: center;
             touch-action: none;
         }
-        .lv-play .pool .candy, .lv-play .dish .candy { cursor: grab; }
+        .pool .candy, .dish .candy { cursor: grab; }
+        .candy.selected {
+            background: var(--focus);
+            border-radius: 50%;
+            box-shadow: 0 0 0 4px rgba(255, 211, 77, 0.5);
+        }
+        #plates.choosing .plate { border-color: var(--focus); border-style: dashed; cursor: pointer; }
         .candy.hidden { visibility: hidden; }
         .candy[data-n]::after {
             content: attr(data-n);
@@ -479,6 +485,7 @@
             misses: 0,
             dealt: false,
             busy: false,
+            selected: null, // レベル2・3で えらんでいる アメ
             lastKey: '',
             run: 0,         // とちゅうで やめたとき アニメを止めるための番号
             sound: store.get('warizan_sound', true)
@@ -631,9 +638,15 @@
 
         // じゅんばんに 1こずつ くばる アニメ（あまりは おきばに のこる）
         async function animateDeal() {
-            if (state.dealt) return;
+            if (state.dealt || isEvenlyDealt()) {
+                markDealt();
+                return;
+            }
             const run = state.run;
             const p = state.problem;
+            // こどもが うごかした アメは いったん おきばに もどしてから くばる
+            selectCandy(null);
+            document.querySelectorAll('.dish .candy').forEach((c) => $('pile').appendChild(c));
             const count = p.d * p.q;
             const step = Math.max(70, Math.min(320, 3000 / count));
             for (let i = 0; i < count; i++) {
@@ -644,8 +657,18 @@
             }
             await wait(400);
             if (run !== state.run) return;
+            markDealt();
+        }
+
+        function isEvenlyDealt() {
+            const p = state.problem;
+            return $('pile').children.length === p.r
+                && plateEls().every((pl) => pl.querySelector('.dish').children.length === p.q);
+        }
+
+        function markDealt() {
             state.dealt = true;
-            if (p.r > 0) $('pool-label').textContent = '🍬 あまり';
+            if (state.problem.r > 0) $('pool-label').textContent = '🍬 あまり';
         }
 
         // 1つずつ ばんごうを つけて かぞえて みせる
@@ -736,7 +759,7 @@
             clearMarks();
             $('next').hidden = true;
             $('choices').innerHTML = '';
-            $('game').classList.toggle('lv-play', state.level === 1);
+            selectCandy(null);
 
             if (state.level === 1) {
                 state.step = 'deal';
@@ -748,6 +771,7 @@
                 askQuotient();
                 speak($('qtext').textContent + ' ' + toSpeech(`${p.total} ÷ ${p.d}`) + ' は？');
             }
+            fitStage(); // しき や せんたくしが でて ひろさが かわった あとで あわせなおす
         }
 
         function askQuotient() {
@@ -767,7 +791,7 @@
             setFormula(state.level === 3
                 ? [`${p.total} ÷ ${p.d} ＝`, { blank: true }, 'あまり', { blank: true }]
                 : [`${p.total} ÷ ${p.d} ＝`, { blank: true }]);
-            setMsg('こたえを えらんでね');
+            setMsg('こたえを えらんでね。🍬を くばって かんがえても いいよ');
             renderChoices(p.q, 1, 9);
         }
 
@@ -806,6 +830,7 @@
             state.busy = true;
             setChoicesDisabled(true);
             if (state.step === 'askR') {
+                await animateDeal();
                 $('pool').classList.add('focus');
                 setMsg('おしい！ のこった 🍬を かぞえて みよう', true);
             } else if (state.level === 1) {
@@ -876,6 +901,7 @@
         }
 
         function finishProblem() {
+            selectCandy(null);
             state.step = 'done';
             state.busy = false;
             state.index++;
@@ -891,16 +917,50 @@
             else newProblem();
         });
 
+        window.addEventListener('resize', () => {
+            if ($('game').classList.contains('active')) fitStage();
+        });
+
         $('speak').addEventListener('click', () => {
             const f = $('formula').textContent.trim();
             speak($('qtext').textContent + (f ? ' ' + f : ''));
         });
 
-        // ===== レベル1：タップ／ドラッグで くばる =====
+        // ===== タップ／ドラッグで くばる =====
+        // レベル1：くばる ばめんだけ。レベル2・3：こたえを えらんでいる あいだ いつでも
+        function canTouchCandies() {
+            if (state.level === 1) return state.step === 'deal';
+            return (state.step === 'askQ' || state.step === 'askR') && !state.busy;
+        }
+
+        // レベル2・3：アメを えらんでから、あげる どうぶつを タップする
+        function selectCandy(el) {
+            const had = state.selected;
+            if (had) had.classList.remove('selected');
+            state.selected = el;
+            if (el) el.classList.add('selected');
+            $('plates').classList.toggle('choosing', !!el);
+            if (el) setMsg('どの どうぶつに あげる？ どうぶつを タップしてね');
+            else if (had && canTouchCandies()) setMsg('こたえを えらんでね。🍬を くばって かんがえても いいよ');
+        }
+
+        function giveSelectedTo(plate) {
+            moveCandy(state.selected, plate.querySelector('.dish'));
+            // つづけて くばれるように、つぎの アメを えらんでおく
+            selectCandy($('pile').querySelector('.candy'));
+            afterDealChange();
+        }
+
+        $('plates').addEventListener('click', (e) => {
+            if (!state.selected || !canTouchCandies() || e.target.closest('.candy')) return;
+            const plate = e.target.closest('.plate');
+            if (plate) giveSelectedTo(plate);
+        });
+
         let drag = null;
 
         $('stage').addEventListener('pointerdown', (e) => {
-            if (state.level !== 1 || state.step !== 'deal') return;
+            if (!canTouchCandies()) return;
             const candy = e.target.closest('.candy');
             if (!candy) return;
             e.preventDefault();
@@ -937,10 +997,22 @@
                 else if (pool) moveCandy(el, $('pile'));
                 else return;
             } else if (e.type === 'pointerup') {
-                // タップ：おきばの アメは いちばん すくない おさらへ、おさらの アメは おきばへ
-                if (el.parentElement === $('pile')) moveCandy(el, fewestDish());
-                else moveCandy(el, $('pile'));
+                const inPile = el.parentElement === $('pile');
+                if (state.level === 1) {
+                    // タップ：おきばの アメは いちばん すくない おさらへ、おさらの アメは おきばへ
+                    moveCandy(el, inPile ? fewestDish() : $('pile'));
+                } else if (inPile) {
+                    // おなじ アメを もういちど タップすると えらぶのを やめる
+                    selectCandy(el === state.selected ? null : el);
+                    return;
+                } else if (state.selected) {
+                    giveSelectedTo(el.closest('.plate'));
+                    return;
+                } else {
+                    moveCandy(el, $('pile'));
+                }
             }
+            if (state.selected && state.selected.parentElement !== $('pile')) selectCandy(null);
             afterDealChange();
         }
         window.addEventListener('pointerup', endDrag);
@@ -952,6 +1024,12 @@
         }
 
         function afterDealChange() {
+            if (state.level > 1) {
+                state.dealt = false;
+                $('pool-label').textContent = '🍬 おきば';
+                if (isEvenlyDealt()) markDealt();
+                return;
+            }
             if (state.step !== 'deal') return;
             const p = state.problem;
             plateEls().forEach((pl) => pl.classList.remove('warn'));
