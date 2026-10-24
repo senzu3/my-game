@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>どうぶつに くばろう</title>
+    <style>
+        :root {
+            --bg: #fff8ec;
+            --ink: #3b3b3b;
+            --sub: #7a7266;
+            --card: #ffffff;
+            --line: #eadfcd;
+            --lv1: #5fb36a;
+            --lv2: #4f9fdc;
+            --lv3: #ee9a4d;
+            --good: #43a85a;
+            --focus: #ffd34d;
+            --c: 40px; /* アメの大きさ（問題ごとにJSで変える） */
+        }
+
+        * { box-sizing: border-box; }
+        [hidden] { display: none !important; }
+
+        html, body {
+            margin: 0;
+            height: 100%;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: 'Hiragino Maru Gothic ProN', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif; /* やわらかい丸ゴシック */
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            overflow: hidden;
+        }
+
+        button {
+            font-family: inherit;
+            color: inherit;
+            cursor: pointer;
+            border: none;
+        }
+
+        .screen {
+            display: none;
+            position: absolute;
+            inset: 0;
+            flex-direction: column;
+            padding: 16px;
+        }
+        .screen.active { display: flex; }
+
+        /* 右上の音ボタン・左上のホームボタン */
+        .icon-btn {
+            min-width: 64px;
+            height: 64px;
+            border-radius: 20px;
+            background: var(--card);
+            border: 3px solid var(--line);
+            font-size: 30px;
+        }
+
+        /* ===== タイトル ===== */
+        #title { align-items: center; justify-content: center; gap: 24px; }
+        #title .corner { position: absolute; top: 16px; right: 16px; }
+        #title h1 {
+            margin: 0;
+            font-size: clamp(34px, 6vw, 56px);
+            letter-spacing: 0.08em;
+            text-align: center;
+        }
+        #title h1 small { display: block; font-size: 0.45em; color: var(--sub); letter-spacing: 0.05em; margin-top: 6px; }
+        .levels {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .level-btn {
+            width: 250px;
+            min-height: 200px;
+            border-radius: 28px;
+            background: var(--card);
+            border: 5px solid;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 6px 0 rgba(0,0,0,0.08);
+            transition: transform 0.1s;
+        }
+        .level-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,0.08); }
+        .level-btn .pic { font-size: 34px; line-height: 1.2; font-weight: bold; }
+        .level-btn .name { font-size: 26px; font-weight: bold; }
+        .level-btn .tag {
+            font-size: 18px;
+            color: #fff;
+            border-radius: 999px;
+            padding: 4px 16px;
+            font-weight: bold;
+        }
+        .lv1 { border-color: var(--lv1); } .lv1 .tag { background: var(--lv1); }
+        .lv2 { border-color: var(--lv2); } .lv2 .tag { background: var(--lv2); }
+        .lv3 { border-color: var(--lv3); } .lv3 .tag { background: var(--lv3); }
+
+        .wide-btn {
+            min-height: 72px;
+            padding: 0 32px;
+            border-radius: 24px;
+            background: var(--card);
+            border: 4px solid var(--line);
+            font-size: 26px;
+            font-weight: bold;
+        }
+
+        /* ===== ゲーム ===== */
+        #game { gap: 10px; }
+        .topbar { display: flex; align-items: center; gap: 12px; }
+        #dots { flex: 1; display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; }
+        .dot {
+            width: 34px; height: 34px;
+            border-radius: 50%;
+            border: 3px solid var(--line);
+            background: var(--card);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+        }
+        .dot.now { border-color: var(--focus); border-width: 4px; }
+
+        .question {
+            background: var(--card);
+            border-radius: 24px;
+            border: 3px solid var(--line);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .question .texts { flex: 1; }
+        #qtext { font-size: clamp(22px, 3vw, 30px); font-weight: bold; line-height: 1.5; }
+        #formula { font-size: clamp(30px, 4.5vw, 46px); font-weight: bold; letter-spacing: 0.06em; margin-top: 4px; }
+        #formula:empty { display: none; }
+        #formula .blank { display: inline-block; min-width: 1.2em; text-align: center; border-bottom: 4px solid var(--sub); color: var(--sub); }
+        #formula .filled { color: var(--good); }
+
+        #stage {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            gap: 16px;
+            align-items: stretch;
+            touch-action: none; /* ドラッグ中に画面がスクロールしないように */
+        }
+        .pool {
+            flex: 0 0 32%;
+            background: #fff3dc;
+            border: 4px dashed #e9c98f;
+            border-radius: 28px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: box-shadow 0.3s;
+        }
+        .pool-label { font-size: 20px; font-weight: bold; color: var(--sub); margin-bottom: 4px; }
+        .pile {
+            flex: 1;
+            display: flex;
+            flex-wrap: wrap;
+            align-content: center;
+            justify-content: center;
+            gap: 2px;
+            overflow: hidden;
+        }
+        #plates {
+            flex: 1;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-evenly;
+            gap: 10px;
+            overflow: hidden;
+        }
+        .plate {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border-radius: 24px;
+            padding: 6px;
+            border: 4px solid transparent;
+            transition: border-color 0.3s, background 0.3s;
+        }
+        .animal { font-size: calc(var(--c) * 1.5); line-height: 1.1; }
+        .dish {
+            min-height: calc(var(--c) * 1.4);
+            min-width: calc(var(--c) * 2.2);
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: radial-gradient(ellipse at center, #ffffff 55%, #f1e7d8 100%);
+            border: 3px solid #e3d5bf;
+            display: flex;
+            flex-wrap: wrap;
+            align-content: center;
+            justify-content: center;
+            gap: 2px;
+        }
+        .plate.warn { border-color: var(--lv3); border-style: dashed; background: #fff1e3; }
+        .plate.focus, .pool.focus { border-color: var(--focus); border-style: solid; background: #fffbe0; box-shadow: 0 0 0 6px rgba(255, 211, 77, 0.35); }
+
+        .candy {
+            position: relative;
+            font-size: var(--c);
+            line-height: 1;
+            width: calc(var(--c) * 1.1);
+            height: calc(var(--c) * 1.1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: none;
+        }
+        .lv-play .pool .candy, .lv-play .dish .candy { cursor: grab; }
+        .candy.hidden { visibility: hidden; }
+        .candy[data-n]::after {
+            content: attr(data-n);
+            position: absolute;
+            top: -6px; right: -6px;
+            min-width: 24px; height: 24px;
+            border-radius: 12px;
+            background: var(--ink);
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .ghost {
+            position: fixed;
+            pointer-events: none;
+            z-index: 50;
+            font-size: calc(var(--c) * 1.2);
+            transform: translate(-50%, -50%);
+        }
+
+        #msg {
+            min-height: 56px;
+            background: var(--card);
+            border-radius: 20px;
+            border: 3px solid var(--line);
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: clamp(20px, 2.6vw, 26px);
+            font-weight: bold;
+        }
+        #msg::before { content: '🐥'; font-size: 32px; }
+
+        .bottom { display: flex; justify-content: center; gap: 20px; min-height: 100px; }
+        .choice {
+            width: 140px;
+            height: 100px;
+            border-radius: 28px;
+            background: var(--card);
+            border: 5px solid var(--lv2);
+            font-size: 52px;
+            font-weight: bold;
+            box-shadow: 0 6px 0 rgba(0,0,0,0.08);
+        }
+        .choice:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,0.08); }
+        .choice:disabled { opacity: 0.3; cursor: default; transform: none; }
+        .choice.right { background: var(--good); border-color: var(--good); color: #fff; opacity: 1; }
+        .choice.glow { border-color: var(--focus); box-shadow: 0 0 0 8px rgba(255, 211, 77, 0.5); }
+        #next {
+            min-width: 280px;
+            height: 100px;
+            border-radius: 28px;
+            background: var(--good);
+            color: #fff;
+            font-size: 36px;
+            font-weight: bold;
+            box-shadow: 0 6px 0 rgba(0,0,0,0.12);
+        }
+
+        /* やめる？の確認 */
+        .modal {
+            display: none;
+            position: absolute;
+            inset: 0;
+            background: rgba(60, 50, 40, 0.35);
+            align-items: center;
+            justify-content: center;
+            z-index: 40;
+        }
+        .modal.active { display: flex; }
+        .modal-box {
+            background: var(--card);
+            border-radius: 28px;
+            padding: 28px 32px;
+            text-align: center;
+            font-size: 30px;
+            font-weight: bold;
+        }
+        .modal-box .row { display: flex; gap: 20px; margin-top: 20px; justify-content: center; }
+
+        /* ===== ごほうび・シールちょう ===== */
+        #reward { align-items: center; justify-content: center; gap: 20px; text-align: center; }
+        #reward h2 { margin: 0; font-size: 40px; }
+        #reward-sticker {
+            font-size: 140px;
+            width: 220px; height: 220px;
+            border-radius: 50%;
+            background: var(--card);
+            border: 6px solid var(--focus);
+            display: flex; align-items: center; justify-content: center;
+            animation: pop 0.6s ease-out;
+        }
+        @keyframes pop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .row { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+
+        #book { gap: 16px; }
+        #book h2 { margin: 0; font-size: 34px; flex: 1; text-align: center; }
+        #sticker-grid {
+            flex: 1;
+            overflow-y: auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+            gap: 12px;
+            align-content: start;
+            background: var(--card);
+            border-radius: 28px;
+            border: 3px solid var(--line);
+            padding: 16px;
+        }
+        .sticker {
+            aspect-ratio: 1;
+            border-radius: 50%;
+            background: #fff8e0;
+            border: 3px solid var(--focus);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 52px;
+        }
+        .empty-note { grid-column: 1 / -1; text-align: center; font-size: 26px; color: var(--sub); padding: 40px 0; }
+
+        /* 縦向きのときは、アメ置き場とお皿を上下に並べる */
+        @media (orientation: portrait) {
+            #stage { flex-direction: column; }
+            .pool { flex: 0 0 30%; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            * { animation: none !important; transition: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- タイトル／レベルえらび -->
+    <section id="title" class="screen active">
+        <div class="corner"><button class="icon-btn sound-btn" aria-label="おと">🔊</button></div>
+        <h1>どうぶつに くばろう<small>わりざん ゲーム</small></h1>
+        <div class="levels">
+            <button class="level-btn lv1" data-level="1">
+                <span class="tag">レベル 1</span>
+                <span class="pic">🍬🍬🍬🍬<br>🐰 🐻</span>
+                <span class="name">くばろう</span>
+            </button>
+            <button class="level-btn lv2" data-level="2">
+                <span class="tag">レベル 2</span>
+                <span class="pic">12 ÷ 3</span>
+                <span class="name">くくで とこう</span>
+            </button>
+            <button class="level-btn lv3" data-level="3">
+                <span class="tag">レベル 3</span>
+                <span class="pic">13 ÷ 3<br><small>あまり 🍬</small></span>
+                <span class="name">あまりも あるよ</span>
+            </button>
+        </div>
+        <button class="wide-btn" id="open-book">📒 シールちょう</button>
+    </section>
+
+    <!-- もんだい -->
+    <section id="game" class="screen">
+        <div class="topbar">
+            <button class="icon-btn" id="home" aria-label="もどる">🏠</button>
+            <div id="dots"></div>
+            <button class="icon-btn sound-btn" aria-label="おと">🔊</button>
+        </div>
+        <div class="question">
+            <div class="texts">
+                <div id="qtext"></div>
+                <div id="formula"></div>
+            </div>
+            <button class="icon-btn" id="speak" aria-label="もういちど きく">🗣️</button>
+        </div>
+        <div id="stage">
+            <div class="pool" id="pool">
+                <div class="pool-label" id="pool-label">🍬 おきば</div>
+                <div class="pile" id="pile"></div>
+            </div>
+            <div id="plates"></div>
+        </div>
+        <div id="msg"></div>
+        <div class="bottom">
+            <div id="choices" class="row"></div>
+            <button id="next" hidden>つぎへ ▶</button>
+        </div>
+
+        <div class="modal" id="quit-modal">
+            <div class="modal-box">
+                やめる？
+                <div class="row">
+                    <button class="wide-btn" id="quit-yes">やめる</button>
+                    <button class="wide-btn" id="quit-no">つづける</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ごほうび -->
+    <section id="reward" class="screen">
+        <h2>10もん できたね！</h2>
+        <div id="reward-sticker"></div>
+        <div style="font-size: 28px; font-weight: bold;">シールを もらったよ</div>
+        <div class="row">
+            <button class="wide-btn" id="again">もういちど</button>
+            <button class="wide-btn" id="to-title">レベルを えらぶ</button>
+            <button class="wide-btn" id="reward-book">📒 シールちょう</button>
+        </div>
+    </section>
+
+    <!-- シールちょう -->
+    <section id="book" class="screen">
+        <div class="topbar">
+            <button class="icon-btn" id="book-back" aria-label="もどる">🏠</button>
+            <h2>📒 シールちょう</h2>
+            <div style="width: 64px;"></div>
+        </div>
+        <div id="sticker-grid"></div>
+    </section>
+
+    <script>
+        const QUESTIONS_PER_ROUND = 10;
+        const ANIMALS = ['🐰', '🐻', '🐼', '🐱', '🐶', '🐸', '🐵', '🐷', '🐯', '🐨', '🦊'];
+        const STICKERS = ['🌟', '🌈', '🍓', '🦄', '🐳', '🌻', '🚀', '🍩', '🎈', '🐞', '🍀', '🦋', '🐧', '🍉', '⚽', '🎵', '🍰', '🐙', '🌸', '🚂'];
+        const PRAISES = ['せいかい！', 'すごいね！', 'やったね！', 'ばっちり！'];
+
+        // 端末に保存（使えない環境でも動くように try/catch）
+        const store = {
+            get(key, fallback) {
+                try {
+                    const v = localStorage.getItem(key);
+                    return v === null ? fallback : JSON.parse(v);
+                } catch (e) { return fallback; }
+            },
+            set(key, value) {
+                try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+            }
+        };
+
+        const $ = (id) => document.getElementById(id);
+        const rand = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
+        const shuffle = (arr) => {
+            const a = arr.slice();
+            for (let i = a.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [a[i], a[j]] = [a[j], a[i]];
+            }
+            return a;
+        };
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+        const state = {
+            level: 1,
+            index: 0,
+            problem: null,
+            step: 'deal',   // deal（くばる）/ askQ（1ぴきぶん）/ askR（あまり）/ done
+            answer: 0,
+            misses: 0,
+            dealt: false,
+            busy: false,
+            lastKey: '',
+            run: 0,         // とちゅうで やめたとき アニメを止めるための番号
+            sound: store.get('warizan_sound', true)
+        };
+
+        // ===== おと =====
+        let audioCtx = null;
+        function chime() {
+            if (!state.sound) return;
+            try {
+                audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+                [660, 880, 1100].forEach((freq, i) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    const t = audioCtx.currentTime + i * 0.12;
+                    osc.type = 'sine';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.0001, t);
+                    gain.gain.exponentialRampToValueAtTime(0.18, t + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+                    osc.connect(gain).connect(audioCtx.destination);
+                    osc.start(t);
+                    osc.stop(t + 0.45);
+                });
+            } catch (e) {}
+        }
+
+        function toSpeech(text) {
+            return text
+                .replace(/🍬/g, 'あめ')
+                .replace(/÷/g, ' わる ')
+                .replace(/＝|=/g, ' は ')
+                .replace(/[？?]/g, '')
+                .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '');
+        }
+
+        function speak(text) {
+            if (!state.sound || !('speechSynthesis' in window)) return;
+            speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(toSpeech(text));
+            u.lang = 'ja-JP';
+            u.rate = 0.85;
+            speechSynthesis.speak(u);
+        }
+
+        function updateSoundButtons() {
+            document.querySelectorAll('.sound-btn').forEach((b) => { b.textContent = state.sound ? '🔊' : '🔇'; });
+        }
+        document.querySelectorAll('.sound-btn').forEach((b) => b.addEventListener('click', () => {
+            state.sound = !state.sound;
+            store.set('warizan_sound', state.sound);
+            if (!state.sound && 'speechSynthesis' in window) speechSynthesis.cancel();
+            updateSoundButtons();
+        }));
+        updateSoundButtons();
+
+        // ===== がめん きりかえ =====
+        function show(id) {
+            document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id));
+        }
+
+        // ===== もんだい づくり =====
+        function makeProblem(level) {
+            let p;
+            do {
+                if (level === 1) {
+                    const d = rand(2, 3);
+                    p = { d, q: d === 2 ? rand(3, 6) : rand(2, 4), r: 0 };
+                } else if (level === 2) {
+                    p = { d: rand(2, 9), q: rand(1, 9), r: 0 };
+                } else {
+                    const d = rand(2, 5);
+                    p = { d, q: rand(1, 9), r: rand(1, d - 1) };
+                }
+                p.total = p.d * p.q + p.r;
+                p.key = p.total + '/' + p.d;
+            } while (p.key === state.lastKey);
+            state.lastKey = p.key;
+            p.animals = shuffle(ANIMALS).slice(0, p.d);
+            return p;
+        }
+
+        // 正解のちかくの数から 3つ えらぶ
+        function makeChoices(answer, min, max) {
+            const picks = [answer];
+            for (const n of shuffle([answer - 1, answer + 1, answer - 2, answer + 2, answer + 3, answer - 3])) {
+                if (picks.length === 3) break;
+                if (n >= min && n <= max && !picks.includes(n)) picks.push(n);
+            }
+            return shuffle(picks);
+        }
+
+        // ===== えの ぶぶん =====
+        // はみ出さない ところまで アメを ちいさくする
+        function fitStage() {
+            const stage = $('stage');
+            const plates = $('plates');
+            const pile = $('pile');
+            for (let c = 44; c >= 14; c -= 2) {
+                stage.style.setProperty('--c', c + 'px');
+                const fits = plates.scrollHeight <= plates.clientHeight + 1 && pile.scrollHeight <= pile.clientHeight + 1;
+                if (fits) return;
+            }
+        }
+
+        function makeCandy() {
+            const c = document.createElement('span');
+            c.className = 'candy';
+            c.textContent = '🍬';
+            return c;
+        }
+
+        const plateEls = () => Array.from(document.querySelectorAll('#plates .plate'));
+        const dishOf = (i) => plateEls()[i].querySelector('.dish');
+
+        function renderStage(p) {
+            $('pool-label').textContent = '🍬 おきば';
+            const pile = $('pile');
+            pile.innerHTML = '';
+            for (let i = 0; i < p.total; i++) pile.appendChild(makeCandy());
+
+            const plates = $('plates');
+            plates.innerHTML = '';
+            // くばりおわった ときの おおきさで おさらを つくっておく
+            const cols = Math.max(2, Math.ceil(Math.sqrt(p.q)));
+            const rows = Math.max(1, Math.ceil(p.q / cols));
+            p.animals.forEach((a) => {
+                const plate = document.createElement('div');
+                plate.className = 'plate';
+                plate.innerHTML = `<div class="animal">${a}</div><div class="dish"></div>`;
+                const dish = plate.querySelector('.dish');
+                dish.style.width = `calc(var(--c) * ${cols * 1.1} + ${cols * 2 + 26}px)`;
+                dish.style.minHeight = `calc(var(--c) * ${rows * 1.1} + ${rows * 2 + 18}px)`;
+                plates.appendChild(plate);
+            });
+            fitStage();
+        }
+
+        // FLIP：もとの いちから あたらしい いちへ すべらせる
+        function moveCandy(el, target) {
+            const a = el.getBoundingClientRect();
+            target.appendChild(el);
+            const b = el.getBoundingClientRect();
+            el.style.transition = 'none';
+            el.style.transform = `translate(${a.left - b.left}px, ${a.top - b.top}px)`;
+            el.offsetWidth; // いちを かくてい させる
+            el.style.transition = 'transform 0.35s ease';
+            el.style.transform = '';
+        }
+
+        // じゅんばんに 1こずつ くばる アニメ（あまりは おきばに のこる）
+        async function animateDeal() {
+            if (state.dealt) return;
+            const run = state.run;
+            const p = state.problem;
+            const count = p.d * p.q;
+            const step = Math.max(70, Math.min(320, 3000 / count));
+            for (let i = 0; i < count; i++) {
+                if (run !== state.run) return;
+                const candy = $('pile').querySelector('.candy');
+                moveCandy(candy, dishOf(i % p.d));
+                await wait(step);
+            }
+            await wait(400);
+            if (run !== state.run) return;
+            state.dealt = true;
+            if (p.r > 0) $('pool-label').textContent = '🍬 あまり';
+        }
+
+        // 1つずつ ばんごうを つけて かぞえて みせる
+        async function countAloud(container) {
+            const run = state.run;
+            const candies = Array.from(container.querySelectorAll('.candy'));
+            speak('かぞえて みよう。' + candies.map((_, i) => i + 1).join('、'));
+            for (let i = 0; i < candies.length; i++) {
+                if (run !== state.run) return;
+                candies[i].dataset.n = i + 1;
+                await wait(550);
+            }
+        }
+
+        function clearMarks() {
+            document.querySelectorAll('.focus, .warn').forEach((e) => e.classList.remove('focus', 'warn'));
+            document.querySelectorAll('.candy[data-n]').forEach((c) => delete c.dataset.n);
+        }
+
+        // ===== がめんの もじ =====
+        function setMsg(text, say) {
+            $('msg').textContent = text;
+            if (say) speak(text);
+        }
+
+        function setFormula(parts) {
+            // parts: [文字 or {blank:true} or {value:n}]
+            $('formula').innerHTML = parts.map((x) => {
+                if (typeof x === 'string') return x;
+                if (x.blank) return '<span class="blank">？</span>';
+                return `<span class="filled">${x.value}</span>`;
+            }).join(' ');
+        }
+
+        function formulaSpeech() {
+            const p = state.problem;
+            return `${p.total} ÷ ${p.d} ＝ ${p.q}` + (p.r ? ` あまり ${p.r}` : '');
+        }
+
+        function renderDots() {
+            const dots = $('dots');
+            dots.innerHTML = '';
+            for (let i = 0; i < QUESTIONS_PER_ROUND; i++) {
+                const d = document.createElement('div');
+                d.className = 'dot' + (i === state.index ? ' now' : '');
+                d.textContent = i < state.index ? '⭐' : '';
+                dots.appendChild(d);
+            }
+        }
+
+        function renderChoices(answer, min, max) {
+            const box = $('choices');
+            box.innerHTML = '';
+            makeChoices(answer, min, max).forEach((n) => {
+                const b = document.createElement('button');
+                b.className = 'choice';
+                b.textContent = n;
+                b.dataset.value = n;
+                b.addEventListener('click', () => onChoice(n, b));
+                box.appendChild(b);
+            });
+            box.hidden = false;
+        }
+
+        function setChoicesDisabled(disabled) {
+            document.querySelectorAll('.choice').forEach((b) => {
+                if (!b.classList.contains('tried')) b.disabled = disabled;
+            });
+        }
+
+        // ===== すすめかた =====
+        function startRound(level) {
+            state.level = level;
+            state.index = 0;
+            show('game');
+            newProblem();
+        }
+
+        function newProblem() {
+            state.run++;
+            const p = makeProblem(state.level);
+            state.problem = p;
+            state.misses = 0;
+            state.dealt = false;
+            state.busy = false;
+            renderDots();
+            renderStage(p);
+            clearMarks();
+            $('next').hidden = true;
+            $('choices').innerHTML = '';
+            $('game').classList.toggle('lv-play', state.level === 1);
+
+            if (state.level === 1) {
+                state.step = 'deal';
+                $('qtext').textContent = `🍬が ${p.total}こ あるよ。${p.d}ひきに おなじ かずずつ くばろう。`;
+                $('formula').innerHTML = '';
+                setMsg('🍬を タップするか、おさらへ はこんでね');
+                speak($('qtext').textContent);
+            } else {
+                askQuotient();
+                speak($('qtext').textContent + ' ' + toSpeech(`${p.total} ÷ ${p.d}`) + ' は？');
+            }
+        }
+
+        function askQuotient() {
+            const p = state.problem;
+            state.step = 'askQ';
+            state.answer = p.q;
+            state.misses = 0;
+            if (state.level === 1) {
+                $('qtext').textContent = '1ぴきに 🍬は なんこ？';
+                setMsg('おさらの 🍬を かぞえてね');
+                speak('1ぴきに あめは なんこ');
+                renderChoices(p.q, 1, 12);
+                return;
+            }
+            const extra = state.level === 3 ? '（あまりも あるよ）' : '';
+            $('qtext').textContent = `🍬 ${p.total}こを ${p.d}ひきに おなじ かずずつ くばると、1ぴき なんこ？${extra}`;
+            setFormula(state.level === 3
+                ? [`${p.total} ÷ ${p.d} ＝`, { blank: true }, 'あまり', { blank: true }]
+                : [`${p.total} ÷ ${p.d} ＝`, { blank: true }]);
+            setMsg('こたえを えらんでね');
+            renderChoices(p.q, 1, 9);
+        }
+
+        function askRemainder() {
+            const p = state.problem;
+            state.step = 'askR';
+            state.answer = p.r;
+            state.misses = 0;
+            clearMarks();
+            $('qtext').textContent = 'あまりは なんこ？';
+            setFormula([`${p.total} ÷ ${p.d} ＝`, { value: p.q }, 'あまり', { blank: true }]);
+            setMsg('のこった 🍬を みてね');
+            speak('あまりは なんこ');
+            renderChoices(p.r, 0, 9);
+        }
+
+        async function onChoice(value, btn) {
+            if (state.busy) return;
+            if (value === state.answer) {
+                btn.classList.add('right');
+                document.querySelectorAll('.choice').forEach((b) => { b.disabled = true; });
+                chime();
+                await handleCorrect();
+                return;
+            }
+            state.misses++;
+            btn.disabled = true;
+            btn.classList.add('tried');
+            if (state.misses === 1) await firstHint();
+            else await secondHint();
+        }
+
+        // 1かいめの まちがい：え で ヒント
+        async function firstHint() {
+            const p = state.problem;
+            state.busy = true;
+            setChoicesDisabled(true);
+            if (state.step === 'askR') {
+                $('pool').classList.add('focus');
+                setMsg('おしい！ のこった 🍬を かぞえて みよう', true);
+            } else if (state.level === 1) {
+                plateEls()[0].classList.add('focus');
+                setMsg('おしい！ ひとつの おさらの 🍬を かぞえて みよう', true);
+            } else {
+                setMsg('おしい！ くばって みるね', true);
+                await animateDeal();
+                plateEls()[0].classList.add('focus');
+                setMsg('1ぴきぶんを かぞえて みよう', true);
+            }
+            state.busy = false;
+            setChoicesDisabled(false);
+        }
+
+        // 2かいめの まちがい：いっしょに かぞえて こたえを みせる
+        async function secondHint() {
+            const run = state.run;
+            state.busy = true;
+            setChoicesDisabled(true);
+            clearMarks();
+            await animateDeal();
+            let target;
+            if (state.step === 'askR') {
+                target = $('pile');
+                $('pool').classList.add('focus');
+            } else {
+                target = dishOf(0);
+                plateEls()[0].classList.add('focus');
+            }
+            setMsg('いっしょに かぞえよう');
+            await countAloud(target);
+            if (run !== state.run) return;
+            document.querySelectorAll('.choice').forEach((b) => {
+                const right = Number(b.dataset.value) === state.answer;
+                b.disabled = !right;
+                b.classList.toggle('glow', right);
+            });
+            setMsg(`こたえは ${state.answer} だよ。おして みよう`, true);
+            state.busy = false;
+        }
+
+        async function handleCorrect() {
+            const run = state.run;
+            const p = state.problem;
+            const praise = PRAISES[rand(0, PRAISES.length - 1)];
+            state.busy = true;
+            clearMarks();
+
+            if (state.step === 'askQ' && state.level === 3) {
+                setFormula([`${p.total} ÷ ${p.d} ＝`, { value: p.q }, 'あまり', { blank: true }]);
+                setMsg(praise + ' くばって みるね', true);
+                await animateDeal();
+                if (run !== state.run) return;
+                state.busy = false;
+                askRemainder();
+                return;
+            }
+
+            setMsg(praise);
+            if (state.level === 2) await animateDeal();
+            if (run !== state.run) return;
+            setFormula(p.r
+                ? [`${p.total} ÷ ${p.d} ＝`, { value: p.q }, 'あまり', { value: p.r }]
+                : [`${p.total} ÷ ${p.d} ＝`, { value: p.q }]);
+            speak(praise + ' ' + formulaSpeech());
+            finishProblem();
+        }
+
+        function finishProblem() {
+            state.step = 'done';
+            state.busy = false;
+            state.index++;
+            renderDots();
+            $('choices').hidden = true;
+            const last = state.index >= QUESTIONS_PER_ROUND;
+            $('next').textContent = last ? 'シールを もらう 🎁' : 'つぎへ ▶';
+            $('next').hidden = false;
+        }
+
+        $('next').addEventListener('click', () => {
+            if (state.index >= QUESTIONS_PER_ROUND) giveSticker();
+            else newProblem();
+        });
+
+        $('speak').addEventListener('click', () => {
+            const f = $('formula').textContent.trim();
+            speak($('qtext').textContent + (f ? ' ' + f : ''));
+        });
+
+        // ===== レベル1：タップ／ドラッグで くばる =====
+        let drag = null;
+
+        $('stage').addEventListener('pointerdown', (e) => {
+            if (state.level !== 1 || state.step !== 'deal') return;
+            const candy = e.target.closest('.candy');
+            if (!candy) return;
+            e.preventDefault();
+            drag = { el: candy, id: e.pointerId, x: e.clientX, y: e.clientY, ghost: null };
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (!drag || e.pointerId !== drag.id) return;
+            if (!drag.ghost && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 12) {
+                drag.ghost = document.createElement('div');
+                drag.ghost.className = 'ghost';
+                drag.ghost.textContent = '🍬';
+                drag.ghost.style.setProperty('--c', getComputedStyle($('stage')).getPropertyValue('--c'));
+                document.body.appendChild(drag.ghost);
+                drag.el.classList.add('hidden');
+            }
+            if (drag.ghost) {
+                drag.ghost.style.left = e.clientX + 'px';
+                drag.ghost.style.top = e.clientY + 'px';
+            }
+        });
+
+        function endDrag(e) {
+            if (!drag || e.pointerId !== drag.id) return;
+            const { el, ghost } = drag;
+            drag = null;
+            if (ghost) {
+                ghost.remove();
+                el.classList.remove('hidden');
+                const under = document.elementFromPoint(e.clientX, e.clientY);
+                const plate = under && under.closest('.plate');
+                const pool = under && under.closest('.pool');
+                if (plate) moveCandy(el, plate.querySelector('.dish'));
+                else if (pool) moveCandy(el, $('pile'));
+                else return;
+            } else if (e.type === 'pointerup') {
+                // タップ：おきばの アメは いちばん すくない おさらへ、おさらの アメは おきばへ
+                if (el.parentElement === $('pile')) moveCandy(el, fewestDish());
+                else moveCandy(el, $('pile'));
+            }
+            afterDealChange();
+        }
+        window.addEventListener('pointerup', endDrag);
+        window.addEventListener('pointercancel', endDrag);
+
+        function fewestDish() {
+            const dishes = plateEls().map((p) => p.querySelector('.dish'));
+            return dishes.reduce((best, d) => (d.children.length < best.children.length ? d : best), dishes[0]);
+        }
+
+        function afterDealChange() {
+            if (state.step !== 'deal') return;
+            const p = state.problem;
+            plateEls().forEach((pl) => pl.classList.remove('warn'));
+            if ($('pile').children.length > 0) {
+                setMsg('🍬を タップするか、おさらへ はこんでね');
+                return;
+            }
+            const uneven = plateEls().filter((pl) => pl.querySelector('.dish').children.length !== p.q);
+            if (uneven.length === 0) {
+                state.dealt = true;
+                setMsg('おなじ かずに なったね！', true);
+                setTimeout(() => { if (state.step === 'deal') askQuotient(); }, 1400);
+                return;
+            }
+            uneven.forEach((pl) => pl.classList.add('warn'));
+            setMsg('おなじ かず かな？ おさらの 🍬を タップすると もどせるよ', true);
+        }
+
+        // ===== ごほうび =====
+        function giveSticker() {
+            const owned = store.get('warizan_stickers', []);
+            const ownedSet = new Set(owned.map((s) => s.s));
+            const fresh = STICKERS.filter((s) => !ownedSet.has(s));
+            const pool = fresh.length ? fresh : STICKERS;
+            const sticker = pool[rand(0, pool.length - 1)];
+            owned.push({ s: sticker, lv: state.level, date: new Date().toISOString().slice(0, 10) });
+            store.set('warizan_stickers', owned);
+            $('reward-sticker').textContent = sticker;
+            show('reward');
+            chime();
+            speak('10もん できたね。シールを もらったよ');
+        }
+
+        function openBook() {
+            const owned = store.get('warizan_stickers', []);
+            const grid = $('sticker-grid');
+            grid.innerHTML = owned.length
+                ? owned.map((s) => `<div class="sticker">${s.s}</div>`).join('')
+                : '<div class="empty-note">まだ ないよ。10もん とくと もらえるよ</div>';
+            show('book');
+        }
+
+        function quitToTitle() {
+            state.run++;
+            if ('speechSynthesis' in window) speechSynthesis.cancel();
+            $('quit-modal').classList.remove('active');
+            show('title');
+        }
+
+        document.querySelectorAll('.level-btn').forEach((b) => b.addEventListener('click', () => startRound(Number(b.dataset.level))));
+        $('open-book').addEventListener('click', openBook);
+        $('reward-book').addEventListener('click', openBook);
+        $('book-back').addEventListener('click', () => show('title'));
+        $('again').addEventListener('click', () => startRound(state.level));
+        $('to-title').addEventListener('click', () => show('title'));
+        $('home').addEventListener('click', () => $('quit-modal').classList.add('active'));
+        $('quit-yes').addEventListener('click', quitToTitle);
+        $('quit-no').addEventListener('click', () => $('quit-modal').classList.remove('active'));
+    </script>
+</body>
+</html>
