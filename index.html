@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>かんじシューティング！</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #0b0c10; /* 宇宙のような暗い背景 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden; /* スクロール防止 */
+            font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif; /* 見やすいゴシック体 */
+            touch-action: none; /* デフォルトのタッチ操作（スワイプなど）を無効化 */
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            height: 100%;
+            max-height: 800px;
+            background: linear-gradient(to bottom, #1f2833, #0b0c10); /* 宇宙のグラデーション */
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UIオーバーレイ */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* UI下のキャンバスを操作できるようにする */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* トップバー (スコア・タイマー・ホーム) */
+        #top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            pointer-events: auto; /* ホームボタンを押せるようにする */
+        }
+
+        .info-text {
+            color: #66fcf1;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(102, 252, 241, 0.8);
+        }
+
+        #home-btn {
+            background-color: rgba(31, 40, 51, 0.8);
+            border: 2px solid #45a29e;
+            color: #45a29e;
+            padding: 8px 15px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        #home-btn:hover {
+            background-color: #45a29e;
+            color: white;
+            transform: scale(0.95);
+        }
+
+        /* 現在の漢字表示エリア */
+        #kanji-display-area {
+            text-align: center;
+            padding-bottom: 30px;
+        }
+
+        #current-kanji {
+            font-size: 72px;
+            color: #ffffff;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5), 2px 2px 0px #45a29e;
+            background: rgba(31, 40, 51, 0.8);
+            padding: 10px 40px;
+            border-radius: 20px;
+            border: 2px solid #45a29e;
+            display: inline-block;
+        }
+
+        /* スタート画面など用 */
+        #message-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto; /* ボタンクリックなどを有効にする */
+            z-index: 10;
+        }
+
+        h1 {
+            color: #66fcf1;
+            font-size: 36px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px rgba(102, 252, 241, 0.8);
+            text-align: center;
+        }
+
+        .btn {
+            background-color: #45a29e;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 24px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: transform 0.1s, background-color 0.2s;
+        }
+
+        .btn:hover, .btn:active {
+            background-color: #66fcf1;
+            color: #1f2833;
+            transform: scale(0.95);
+        }
+
+        .mode-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="ui-layer">
+        <div id="top-bar">
+            <div class="info-text">スコア: <span id="score">0</span></div>
+            <div id="timer-display" class="info-text hidden">のこり: <span id="time">60</span>秒</div>
+            <button id="home-btn">🏠 ホーム</button>
+        </div>
+        <div id="kanji-display-area">
+            <div id="current-kanji">水</div>
+        </div>
+    </div>
+
+    <div id="message-overlay">
+        <h1 id="main-title">かんじ<br>シューティング！</h1>
+        <p id="main-desc" style="color: white; margin-bottom: 20px; text-align: center;">
+            正しい よみかた を うちおとそう！<br>
+            【PC】 左右矢印キーでいどう・スペースキーでうつ<br>
+            【スマホ】 画面をタッチして動かす・タップでうつ
+        </p>
+        <div id="start-buttons" class="mode-buttons">
+            <button id="start-endless-btn" class="btn">エンドレスモード</button>
+            <button id="start-timeattack-btn" class="btn">タイムアタック (60秒)</button>
+        </div>
+        <div id="result-buttons" class="mode-buttons hidden">
+            <button id="retry-btn" class="btn">もう一度あそぶ</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * ========================================================
+ * 問題データの設定エリア
+ * 先生が問題を追加・修正する場合は、ここを編集してください。
+ * ========================================================
+ */
+const KANJI_DATA = [
+    { kanji: "水", correct: "みず", dummies: ["き", "ひ", "み"] },
+    { kanji: "山", correct: "やま", dummies: ["かわ", "た", "そら"] },
+    { kanji: "空", correct: "そら", dummies: ["うみ", "くも", "あめ"] },
+    { kanji: "花", correct: "はな", dummies: ["くさ", "きのこ", "き"] },
+    { kanji: "音", correct: "おと", dummies: ["こえ", "うた", "きく"] },
+    { kanji: "犬", correct: "いぬ", dummies: ["ねこ", "とり", "さる"] },
+    { kanji: "車", correct: "くるま", dummies: ["でんしゃ", "ふね", "じてんしゃ"] },
+    { kanji: "木", correct: "き", dummies: ["くさ", "はな", "えだ"] },
+    { kanji: "月", correct: "つき", dummies: ["ほし", "たいよう", "そら"] },
+    { kanji: "火", correct: "ひ", dummies: ["みず", "つち", "かぜ"] },
+    { kanji: "川", correct: "かわ", dummies: ["うみ", "いけ", "みず"] },
+    { kanji: "森", correct: "もり", dummies: ["はやし", "き", "やま"] },
+    { kanji: "海", correct: "うみ", dummies: ["かわ", "いけ", "みず"] },
+    { kanji: "鳥", correct: "とり", dummies: ["さかな", "むし", "けもの"] },
+    { kanji: "魚", correct: "さかな", dummies: ["とり", "むし", "にく"] },
+    { kanji: "春", correct: "はる", dummies: ["なつ", "あき", "ふゆ"] },
+    { kanji: "夏", correct: "なつ", dummies: ["はる", "あき", "ふゆ"] },
+    { kanji: "星", correct: "ほし", dummies: ["つき", "くも", "そら"] },
+    { kanji: "風", correct: "かぜ", dummies: ["あめ", "ゆき", "くも"] },
+    { kanji: "色", correct: "いろ", dummies: ["かたち", "おと", "あじ"] },
+    { kanji: "石", correct: "いし", dummies: ["いわ", "すな", "つち"] },
+    { kanji: "足", correct: "あし", dummies: ["て", "くび", "かた"] },
+    // ↓ 今回追加した「食べ物・乗り物」の漢字
+    { kanji: "肉", correct: "にく", dummies: ["さかな", "やさい", "たまご"] },
+    { kanji: "米", correct: "こめ", dummies: ["むぎ", "まめ", "いも"] },
+    { kanji: "茶", correct: "ちゃ", dummies: ["みず", "ぎゅうにゅう", "ジュース"] },
+    { kanji: "貝", correct: "かい", dummies: ["さかな", "えび", "かに"] },
+    { kanji: "船", correct: "ふね", dummies: ["くるま", "ひこうき", "でんしゃ"] },
+    { kanji: "町", correct: "まち", dummies: ["むら", "くに", "いえ"] }
+];
+
+/**
+ * ========================================================
+ * ゲームのメインロジック
+ * ========================================================
+ */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreElement = document.getElementById('score');
+const timeElement = document.getElementById('time');
+const timerDisplay = document.getElementById('timer-display');
+const currentKanjiElement = document.getElementById('current-kanji');
+const startEndlessBtn = document.getElementById('start-endless-btn');
+const startTimeAttackBtn = document.getElementById('start-timeattack-btn');
+const retryBtn = document.getElementById('retry-btn');
+const homeBtn = document.getElementById('home-btn');
+const messageOverlay = document.getElementById('message-overlay');
+const mainTitle = document.getElementById('main-title');
+const mainDesc = document.getElementById('main-desc');
+const startButtons = document.getElementById('start-buttons');
+const resultButtons = document.getElementById('result-buttons');
+const gameContainer = document.getElementById('game-container');
+
+// キャンバスのサイズをコンテナに合わせる関数
+function resizeCanvas() {
+    canvas.width = gameContainer.clientWidth;
+    canvas.height = gameContainer.clientHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas(); // 初期化
+
+// --- ゲーム状態変数 ---
+let isPlaying = false;
+let score = 0;
+let animationId;
+let currentProblemIndex = 0;
+let currentProblem = null;
+let gameMode = 'endless'; // 'endless' or 'timeAttack'
+let timeLeft = 60;
+let timerInterval = null;
+
+// --- オブジェクト群 ---
+const player = {
+    x: canvas.width / 2,
+    y: canvas.height - 150, // 漢字表示に被らないように少し上に
+    size: 40,
+    emoji: "🚀",
+    speed: 7,
+    moveLeft: false,
+    moveRight: false,
+    targetX: canvas.width / 2 // タッチ操作用
+};
+
+let bullets = [];
+let enemies = [];
+let particles = []; // エフェクト用
+let effects = [];   // テキストエフェクト用 (正解！など)
+
+// 星（背景用）
+let stars = Array.from({length: 50}, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    speed: Math.random() * 2 + 0.5,
+    size: Math.random() * 2 + 1
+}));
+
+// --- 入力処理 ---
+
+// キーボード
+window.addEventListener('keydown', (e) => {
+    if(e.key === 'ArrowLeft') player.moveLeft = true;
+    if(e.key === 'ArrowRight') player.moveRight = true;
+    if(e.key === ' ' && isPlaying) shoot();
+});
+window.addEventListener('keyup', (e) => {
+    if(e.key === 'ArrowLeft') player.moveLeft = false;
+    if(e.key === 'ArrowRight') player.moveRight = false;
+});
+
+let lastTapTime = 0;
+
+// タッチ＆マウス操作
+function handleTouchMove(e) {
+    e.preventDefault(); // スクロール防止
+    if (!isPlaying) return;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    // 指の位置を中心に自機を移動させる
+    player.targetX = clientX - rect.left;
+}
+
+function handleTouchDown(e) {
+    if(e.target.tagName && e.target.tagName.toLowerCase() === 'button') return; // ボタンタップ時などは弾を撃たない
+    if (!isPlaying) return;
+    e.preventDefault();
+    
+    handleTouchMove(e);
+    
+    const currentTime = new Date().getTime();
+    const tapLength = currentTime - lastTapTime;
+    
+    // 前回タップしてから300ミリ秒以内ならダブルタップと判定
+    if (tapLength < 300 && tapLength > 0) {
+        shoot();
+        lastTapTime = 0; // 連続発射を防ぐためにリセット
+    } else {
+        lastTapTime = currentTime;
+    }
+}
+
+// リスナーの登録
+canvas.addEventListener('touchstart', handleTouchDown, {passive: false});
+canvas.addEventListener('touchmove', handleTouchMove, {passive: false});
+canvas.addEventListener('mousedown', handleTouchDown);
+canvas.addEventListener('mousemove', (e) => {
+    if (isPlaying && e.buttons === 1) { // ドラッグ中
+        handleTouchMove(e);
+    } else if (isPlaying) {
+        // マウスが動くだけでも追従させる（PCでの操作性向上）
+        const rect = canvas.getBoundingClientRect();
+        player.targetX = e.clientX - rect.left;
+    }
+});
+
+// --- ゲーム機能関数 ---
+
+function shoot() {
+    bullets.push({
+        x: player.x,
+        y: player.y - player.size / 2,
+        radius: 5,
+        speed: 10,
+        color: "#66fcf1"
+    });
+}
+
+// 配列をシャッフルするヘルパー関数
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+// 問題のセットアップと敵の生成
+function spawnEnemies() {
+    enemies = [];
+    currentProblem = KANJI_DATA[currentProblemIndex];
+    currentKanjiElement.innerText = currentProblem.kanji;
+    
+    // 正解とダミーをまとめた配列を作る
+    let words = [{ text: currentProblem.correct, isCorrect: true }];
+    currentProblem.dummies.forEach(dummy => {
+        words.push({ text: dummy, isCorrect: false });
+    });
+    
+    words = shuffleArray(words);
+    
+    // 配置の計算 (画面幅を分割して配置)
+    const padding = 60;
+    const availableWidth = canvas.width - padding * 2;
+    const spacing = availableWidth / (words.length - 1);
+    
+    words.forEach((word, index) => {
+        let enemyX;
+        if (words.length === 1) {
+            enemyX = canvas.width / 2;
+        } else {
+             enemyX = padding + spacing * index;
+        }
+
+        // ブロックの幅は文字数によって変える
+        const blockWidth = word.text.length * 20 + 30;
+
+        enemies.push({
+            text: word.text,
+            isCorrect: word.isCorrect,
+            x: enemyX,
+            y: -50 - Math.random() * 50, // 画面上部から少しランダムにバラして降らせる
+            width: blockWidth,
+            height: 40,
+            speed: 1.5 + Math.random() * 1.5 // 落下速度も少しランダムに
+        });
+    });
+}
+
+// 次の問題へ
+function nextProblem() {
+    currentProblemIndex++;
+    if (currentProblemIndex >= KANJI_DATA.length) {
+        // 問題が一巡したらシャッフルして最初から（無限ループ）
+        shuffleArray(KANJI_DATA);
+        currentProblemIndex = 0;
+    }
+    spawnEnemies();
+}
+
+// 爆発パーティクル生成
+function createParticles(x, y, color) {
+    for (let i = 0; i < 15; i++) {
+        particles.push({
+            x: x,
+            y: y,
+            vx: (Math.random() - 0.5) * 10,
+            vy: (Math.random() - 0.5) * 10,
+            radius: Math.random() * 3 + 1,
+            color: color,
+            life: 1.0 // 寿命 (1.0 -> 0)
+        });
+    }
+}
+
+// テキストエフェクト生成
+function createTextEffect(x, y, text, color) {
+    effects.push({
+        x: x,
+        y: y,
+        text: text,
+        color: color,
+        life: 1.0,
+        vy: -2 // 少し上に上がる
+    });
+}
+
+// --- 更新処理 ---
+function update() {
+    if (!isPlaying) return;
+
+    // 自機の移動 (キーボード)
+    if (player.moveLeft && player.x > player.size / 2) player.x -= player.speed;
+    if (player.moveRight && player.x < canvas.width - player.size / 2) player.x += player.speed;
+
+    // 自機の移動 (タッチ/マウスへの追従 - スムーズな移動)
+    if (Math.abs(player.targetX - player.x) > player.speed) {
+        player.x += (player.targetX > player.x ? player.speed : -player.speed);
+    } else {
+        player.x = player.targetX;
+    }
+    
+    // 画面外に出ないように制限
+    player.x = Math.max(player.size / 2, Math.min(canvas.width - player.size / 2, player.x));
+    player.y = canvas.height - 150; // 常に一定の高さ
+
+    // 弾の移動
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        bullets[i].y -= bullets[i].speed;
+        if (bullets[i].y < 0) bullets.splice(i, 1);
+    }
+
+    // 背景の星の移動
+    stars.forEach(star => {
+        star.y += star.speed;
+        if (star.y > canvas.height) {
+            star.y = 0;
+            star.x = Math.random() * canvas.width;
+        }
+    });
+
+    let needRespawn = false;
+
+    // 敵（読み仮名）の移動
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let e = enemies[i];
+        e.y += e.speed;
+
+        // 画面下部に到達したかチェック
+        if (e.y > canvas.height) {
+            needRespawn = true; // 1つでも下まで行ったら再配置フラグを立てる
+        }
+    }
+
+    // もし下まで到達してしまったら、同じ問題で再配置
+    if (needRespawn) {
+        spawnEnemies();
+    }
+
+    // 当たり判定 (弾 vs 敵)
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        let b = bullets[i];
+        let hit = false;
+
+        for (let j = enemies.length - 1; j >= 0; j--) {
+            let e = enemies[j];
+            // シンプルな矩形判定 (弾は中心点として扱う)
+            if (b.x > e.x - e.width / 2 && b.x < e.x + e.width / 2 &&
+                b.y > e.y - e.height / 2 && b.y < e.y + e.height / 2) {
+                
+                hit = true;
+                
+                if (e.isCorrect) {
+                    // 正解！
+                    score += 10;
+                    scoreElement.innerText = score;
+                    createParticles(e.x, e.y, "#66fcf1");
+                    createTextEffect(e.x, e.y, "正解！", "#66fcf1");
+                    enemies = []; // 全ての敵を消す
+                    setTimeout(nextProblem, 500); // 少し待って次の問題へ
+                } else {
+                    // 不正解...
+                    score = Math.max(0, score - 5); // スコアは0未満にしない
+                    scoreElement.innerText = score;
+                    createParticles(e.x, e.y, "#ff4c4c");
+                    createTextEffect(e.x, e.y, "❌", "#ff4c4c");
+                    enemies.splice(j, 1); // 撃った不正解だけ消す
+                }
+                break; // 1つの弾は1つの敵にだけ当たる
+            }
+        }
+        if (hit) bullets.splice(i, 1); // 当たった弾は消す
+    }
+
+    // 当たり判定 (自機 vs 敵)
+    for (let j = enemies.length - 1; j >= 0; j--) {
+        let e = enemies[j];
+        // 自機と敵の距離で簡易的な矩形判定
+        if (Math.abs(player.x - e.x) < (player.size / 2 + e.width / 2) &&
+            Math.abs(player.y - e.y) < (player.size / 2 + e.height / 2)) {
+            
+            if (e.isCorrect) {
+                // 正解！
+                score += 10;
+                scoreElement.innerText = score;
+                createParticles(e.x, e.y, "#66fcf1");
+                createTextEffect(e.x, e.y, "正解！", "#66fcf1");
+                enemies = []; // 全ての敵を消す
+                setTimeout(nextProblem, 500); // 少し待って次の問題へ
+            } else {
+                // 不正解...
+                score = Math.max(0, score - 5); // スコアは0未満にしない
+                scoreElement.innerText = score;
+                createParticles(e.x, e.y, "#ff4c4c");
+                createTextEffect(e.x, e.y, "❌", "#ff4c4c");
+                enemies.splice(j, 1); // ぶつかった不正解だけ消す
+            }
+            break; // 1度にぶつかるのは1つまで
+        }
+    }
+
+    // パーティクルの更新
+    for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life -= 0.05;
+        if (p.life <= 0) particles.splice(i, 1);
+    }
+
+    // エフェクトの更新
+    for (let i = effects.length - 1; i >= 0; i--) {
+        let e = effects[i];
+        e.y += e.vy;
+        e.life -= 0.02;
+        if (e.life <= 0) effects.splice(i, 1);
+    }
+}
+
+// --- 描画処理 ---
+function draw() {
+    // 描画をクリア
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 星の描画
+    ctx.fillStyle = "#ffffff";
+    stars.forEach(star => {
+        ctx.globalAlpha = Math.random() * 0.5 + 0.5; // きらきらさせる
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    ctx.globalAlpha = 1.0;
+
+    if (!isPlaying) return; // プレイ中以外は背景だけ描画
+
+    // 自機の描画（絵文字）
+    ctx.font = `${player.size}px Arial`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(player.emoji, player.x, player.y);
+
+    // 弾の描画
+    bullets.forEach(b => {
+        ctx.fillStyle = b.color;
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
+        ctx.fill();
+        // 弾の光彩
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = b.color;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+    });
+
+    // 敵（読み仮名ブロック）の描画
+    enemies.forEach(e => {
+        // ブロックの背景
+        ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+        // 角丸矩形を描画 (簡略化のために通常の矩形で角丸っぽく見せるパス)
+        const r = 10;
+        ctx.beginPath();
+        ctx.moveTo(e.x - e.width/2 + r, e.y - e.height/2);
+        ctx.lineTo(e.x + e.width/2 - r, e.y - e.height/2);
+        ctx.quadraticCurveTo(e.x + e.width/2, e.y - e.height/2, e.x + e.width/2, e.y - e.height/2 + r);
+        ctx.lineTo(e.x + e.width/2, e.y + e.height/2 - r);
+        ctx.quadraticCurveTo(e.x + e.width/2, e.y + e.height/2, e.x + e.width/2 - r, e.y + e.height/2);
+        ctx.lineTo(e.x - e.width/2 + r, e.y + e.height/2);
+        ctx.quadraticCurveTo(e.x - e.width/2, e.y + e.height/2, e.x - e.width/2, e.y + e.height/2 - r);
+        ctx.lineTo(e.x - e.width/2, e.y - e.height/2 + r);
+        ctx.quadraticCurveTo(e.x - e.width/2, e.y - e.height/2, e.x - e.width/2 + r, e.y - e.height/2);
+        ctx.fill();
+
+        // テキストの描画
+        ctx.fillStyle = "#1f2833";
+        ctx.font = "bold 20px 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(e.text, e.x, e.y);
+    });
+
+    // パーティクルの描画
+    particles.forEach(p => {
+        ctx.globalAlpha = p.life;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    ctx.globalAlpha = 1.0;
+
+    // テキストエフェクトの描画
+    effects.forEach(e => {
+        ctx.globalAlpha = e.life;
+        ctx.fillStyle = e.color;
+        ctx.font = "bold 28px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(e.text, e.x, e.y);
+    });
+    ctx.globalAlpha = 1.0;
+}
+
+// ゲームループ
+function gameLoop() {
+    update();
+    draw();
+    animationId = requestAnimationFrame(gameLoop);
+}
+
+// タイムアタック用タイマー
+function updateTimer() {
+    timeLeft--;
+    timeElement.innerText = timeLeft;
+    if (timeLeft <= 0) {
+        endGame();
+    }
+}
+
+// ゲーム終了処理
+function endGame() {
+    isPlaying = false;
+    clearInterval(timerInterval);
+    
+    mainTitle.innerHTML = `タイムアップ！<br>スコア: ${score}点`;
+    mainDesc.innerHTML = "よくがんばりました！";
+    
+    startButtons.classList.add('hidden');
+    resultButtons.classList.remove('hidden');
+    messageOverlay.classList.remove('hidden');
+}
+
+// ホーム画面へ戻る
+function goHome() {
+    isPlaying = false;
+    clearInterval(timerInterval);
+    
+    mainTitle.innerHTML = "かんじ<br>シューティング！";
+    mainDesc.innerHTML = `正しい よみかた を うちおとそう！<br>
+        【PC】 左右矢印キーでいどう・スペースキーでうつ<br>
+        【スマホ】 画面をタッチして動かす・タップでうつ`;
+        
+    startButtons.classList.remove('hidden');
+    resultButtons.classList.add('hidden');
+    messageOverlay.classList.remove('hidden');
+}
+
+// ゲーム開始処理
+function startGame(mode) {
+    isPlaying = true;
+    score = 0;
+    scoreElement.innerText = score;
+    gameMode = mode;
+    
+    messageOverlay.classList.add('hidden'); // スタート画面を隠す
+    
+    if (gameMode === 'timeAttack') {
+        timeLeft = 60;
+        timeElement.innerText = timeLeft;
+        timerDisplay.classList.remove('hidden');
+        clearInterval(timerInterval);
+        timerInterval = setInterval(updateTimer, 1000);
+    } else {
+        timerDisplay.classList.add('hidden');
+        clearInterval(timerInterval);
+    }
+    
+    // 初期化
+    bullets = [];
+    particles = [];
+    effects = [];
+    player.x = canvas.width / 2;
+    player.targetX = player.x;
+    
+    shuffleArray(KANJI_DATA);
+    currentProblemIndex = 0;
+    spawnEnemies();
+}
+
+// イベントリスナー
+startEndlessBtn.addEventListener('click', () => startGame('endless'));
+startTimeAttackBtn.addEventListener('click', () => startGame('timeAttack'));
+retryBtn.addEventListener('click', () => startGame(gameMode));
+homeBtn.addEventListener('click', goHome);
+
+// 初期描画だけ開始しておく（背景の星を動かすため）
+gameLoop();
+
+</script>
+
+</body>
+</html>
