@@ -108,6 +108,13 @@
         .lv2 { border-color: var(--lv2); } .lv2 .tag { background: var(--lv2); }
         .lv3 { border-color: var(--lv3); } .lv3 .tag { background: var(--lv3); }
 
+        #resume {
+            border-color: var(--focus);
+            background: #fffbe0;
+            min-height: 84px;
+            font-size: 28px;
+        }
+
         .wide-btn {
             min-height: 72px;
             padding: 0 32px;
@@ -368,6 +375,7 @@
     <section id="title" class="screen active">
         <div class="corner"><button class="icon-btn sound-btn" aria-label="おと">🔊</button></div>
         <h1>どうぶつに くばろう<small>わりざん ゲーム</small></h1>
+        <button class="wide-btn" id="resume" hidden></button>
         <div class="levels">
             <button class="level-btn lv1" data-level="1">
                 <span class="tag">レベル 1</span>
@@ -577,6 +585,47 @@
         // ===== がめん きりかえ =====
         function show(id) {
             document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id));
+            if (id === 'title') renderResume();
+        }
+
+        // ===== とちゅうから つづける =====
+        // とけた もんだいの かずを ほぞんしておき、つぎに ひらいたとき つづきから はじめられる
+        const PROGRESS_KEY = 'warizan_progress';
+
+        function saveProgress() {
+            store.set(PROGRESS_KEY, { level: state.level, index: state.index });
+        }
+
+        function clearProgress() {
+            store.set(PROGRESS_KEY, null);
+        }
+
+        function savedProgress() {
+            const p = store.get(PROGRESS_KEY, null);
+            return p && [1, 2, 3].includes(p.level) && p.index > 0 ? p : null;
+        }
+
+        function renderResume() {
+            const p = savedProgress();
+            const btn = $('resume');
+            btn.hidden = !p;
+            if (!p) return;
+            btn.textContent = p.index >= QUESTIONS_PER_ROUND
+                ? `🎁 シールを もらう（レベル ${p.level}）`
+                : `▶ つづきから（レベル ${p.level}・あと ${QUESTIONS_PER_ROUND - p.index}もん）`;
+        }
+
+        function resume() {
+            const p = savedProgress();
+            if (!p) return;
+            if (p.index >= QUESTIONS_PER_ROUND) {
+                // 10もん おわって シールを もらう まえに やめていた
+                state.level = p.level;
+                state.index = p.index;
+                giveSticker();
+                return;
+            }
+            startRound(p.level, p.index);
         }
 
         // ===== もんだい づくり =====
@@ -772,9 +821,10 @@
         }
 
         // ===== すすめかた =====
-        function startRound(level) {
+        function startRound(level, index = 0) {
             state.level = level;
-            state.index = 0;
+            state.index = index;
+            if (index === 0) clearProgress(); // あたらしく はじめたら まえの つづきは けす
             show('game');
             newProblem();
         }
@@ -937,6 +987,7 @@
             state.step = 'done';
             state.busy = false;
             state.index++;
+            saveProgress();
             renderDots();
             $('choices').hidden = true;
             const last = state.index >= QUESTIONS_PER_ROUND;
@@ -1090,6 +1141,7 @@
             const sticker = pool[rand(0, pool.length - 1)];
             owned.push({ s: sticker, lv: state.level, date: new Date().toISOString().slice(0, 10) });
             store.set('warizan_stickers', owned);
+            clearProgress();
             $('reward-sticker').textContent = sticker;
             show('reward');
             chime();
@@ -1113,6 +1165,8 @@
         }
 
         document.querySelectorAll('.level-btn').forEach((b) => b.addEventListener('click', () => startRound(Number(b.dataset.level))));
+        $('resume').addEventListener('click', resume);
+        renderResume();
         $('open-book').addEventListener('click', openBook);
         $('reward-book').addEventListener('click', openBook);
         $('book-back').addEventListener('click', () => show('title'));
