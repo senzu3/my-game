@@ -468,6 +468,7 @@
         const $ = (id) => document.getElementById(id);
 
         const PHOTO_MAX = 1024;   // しゃしんの ながい ほうの おおきさ
+        const SEG_MAX = 512;      // AI に わたす がぞうの おおきさ（AI の なかでも この くらいに ちぢめられる）
         const THUMB_SIZE = 240;
         const LONG_PRESS_MS = 800;
 
@@ -526,6 +527,7 @@
         const MP_BASE = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}`;
         const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/interactive_segmenter/magic_touch/float32/1/magic_touch.tflite';
         let segmenterPromise = null;
+        let segmenterReady = false;
         function loadSegmenter() {
             if (!segmenterPromise) {
                 segmenterPromise = (async () => {
@@ -536,7 +538,15 @@
                         outputCategoryMask: true,
                         outputConfidenceMasks: false,
                     });
-                    try { return await create('GPU'); } catch (e) { return await create('CPU'); }
+                    let segmenter;
+                    try { segmenter = await create('GPU'); } catch (e) { segmenter = await create('CPU'); }
+                    // さいしょの 1かいは GPU の じゅんびで おそいので、ちいさな がぞうで すませておく
+                    const warm = document.createElement('canvas');
+                    warm.width = warm.height = 64;
+                    warm.getContext('2d').fillRect(16, 16, 32, 32);
+                    try { segmenter.segment(warm, { keypoint: { x: 0.5, y: 0.5 } }, () => {}); } catch (e) {}
+                    segmenterReady = true;
+                    return segmenter;
                 })();
                 segmenterPromise.catch(() => { segmenterPromise = null; });   // しっぱい したら つぎに やりなおす
             }
@@ -587,8 +597,8 @@
             }
         }
 
-        function drawScaled(source, sw, sh) {
-            const scale = Math.min(1, PHOTO_MAX / Math.max(sw, sh));
+        function drawScaled(source, sw, sh, max = PHOTO_MAX) {
+            const scale = Math.min(1, max / Math.max(sw, sh));
             const c = document.createElement('canvas');
             c.width = Math.round(sw * scale);
             c.height = Math.round(sh * scale);
@@ -620,12 +630,14 @@
         });
 
         // ===== タッチで きりぬき =====
-        const edit = { photo: null, mask: null, busy: false };
+        // small: AI に わたす ちいさい しゃしん / silhouette: しゃしんと おなじ おおきさの くろい かたち
+        const edit = { photo: null, small: null, silhouette: null, box: null, busy: false };
 
         function openEdit(photo) {
             show('edit');
             edit.photo = photo;
-            edit.mask = null;
+            edit.small = drawScaled(photo, photo.width, photo.height, SEG_MAX);
+            edit.silhouette = null;
             const pc = $('photo-canvas'), mc = $('mask-canvas');
             pc.width = mc.width = photo.width;
             pc.height = mc.height = photo.height;
@@ -647,6 +659,12 @@
         }
         window.addEventListener('resize', () => { fitEdit(); fitStage(); });
 
+        // がめんが いちど かきかえられるのを まつ（うらに ある タブでも とまらないように 100ms で うちきり）
+        const nextPaint = () => new Promise((resolve) => {
+            requestAnimationFrame(() => setTimeout(resolve, 0));
+            setTimeout(resolve, 100);
+        });
+
         function setBusy(text) {
             $('edit-busy').hidden = !text;
             if (text) $('busy-text').textContent = text;
@@ -665,11 +683,11 @@
 
             edit.busy = true;
             const photo = edit.photo;
-            let ready = false;
-            loadSegmenter().then(() => { ready = true; }, () => {});
-            setTimeout(() => setBusy(ready ? 'かんがえちゅう…' : 'じゅんび ちゅう…'), 0);
+            // くるくるを さきに がめんに だしてから AI を うごかす
+            setBusy(segmenterReady ? 'かんがえちゅう…' : 'じゅんび ちゅう…');
+            await nextPaint();
             try {
-                const mask = await segmentAt(photo, x, y);
+                const mask = await segmentAt(edit.small, x, y);
                 if (photo !== edit.photo) return;   // とちゅうで とりなおした
                 showMask(mask);
             } catch (err) {
@@ -681,19 +699,34 @@
         });
 
         function showMask(mask) {
+            const { width: sw, height: sh } = edit.small;
             const { width: w, height: h } = edit.photo;
-            const box = maskBox(mask, w, h);
-            const area = box ? box.count / (w * h) : 0;
+            const box = maskBox(mask, sw, sh);
+            const area = box ? box.count / (sw * sh) : 0;
             const mc = $('mask-canvas').getContext('2d');
+            mc.clearRect(0, 0, w, h);
             if (!box || area < 0.003 || area > 0.95) {
-                edit.mask = null;
-                mc.clearRect(0, 0, w, h);
+                edit.silhouette = null;
                 $('save').hidden = true;
                 $('edit-msg').textContent = 'うまく とれなかったよ。ほかの ところを タッチしてね';
                 return;
             }
-            edit.mask = mask;
-            mc.putImageData(silhouetteData(mask, w, h, 215), 0, 0);
+            // ちいさい かたちを しゃしんの おおきさに のばす（ふちも なめらかに なる）
+            const small = document.createElement('canvas');
+            small.width = sw; small.height = sh;
+            small.getContext('2d').putImageData(silhouetteData(mask, sw, sh), 0, 0);
+            const sil = document.createElement('canvas');
+            sil.width = w; sil.height = h;
+            const sc = sil.getContext('2d');
+            sc.imageSmoothingQuality = 'high';
+            sc.drawImage(small, 0, 0, w, h);
+            const k = w / sw;
+            edit.silhouette = sil;
+            edit.box = { x: box.x * k, y: box.y * k, w: box.w * k, h: box.h * k };
+
+            mc.globalAlpha = 0.85;
+            mc.drawImage(sil, 0, 0);
+            mc.globalAlpha = 1;
             $('save').hidden = false;
             $('save').disabled = false;
             $('edit-msg').textContent = 'この かたちで いい？ ちがったら タッチしなおしてね';
@@ -715,10 +748,10 @@
             return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1, count };
         }
 
-        function silhouetteData(mask, w, h, alpha = 255) {
+        function silhouetteData(mask, w, h) {
             const data = new ImageData(w, h);
             for (let i = 0; i < mask.length; i++) {
-                if (mask[i]) data.data[i * 4 + 3] = alpha;   // くろ（rgb は 0 のまま）
+                if (mask[i]) data.data[i * 4 + 3] = 255;   // くろ（rgb は 0 のまま）
             }
             return data;
         }
@@ -728,18 +761,15 @@
         });
 
         $('save').addEventListener('click', async () => {
-            if (!edit.mask || edit.busy) return;
+            if (!edit.silhouette || edit.busy) return;
             edit.busy = true;
             $('save').disabled = true;
             setBusy('ほぞん ちゅう…');
             try {
                 const photo = edit.photo;
                 const { width: w, height: h } = photo;
-                const box = maskBox(edit.mask, w, h);
-
-                const sil = document.createElement('canvas');
-                sil.width = w; sil.height = h;
-                sil.getContext('2d').putImageData(silhouetteData(edit.mask, w, h), 0, 0);
+                const box = edit.box;
+                const sil = edit.silhouette;
 
                 const cut = document.createElement('canvas');
                 cut.width = w; cut.height = h;
@@ -753,20 +783,18 @@
                 const side = Math.max(box.w, box.h) + pad * 2;
                 const thumb = document.createElement('canvas');
                 thumb.width = thumb.height = THUMB_SIZE;
-                const k = THUMB_SIZE / side;
                 thumb.getContext('2d').drawImage(sil,
                     box.x + box.w / 2 - side / 2, box.y + box.h / 2 - side / 2, side, side,
                     0, 0, THUMB_SIZE, THUMB_SIZE);
 
-                await saveQuiz({
-                    id: Date.now(),
-                    w, h,
-                    box: { x: box.x, y: box.y, w: box.w, h: box.h },
-                    photo: await toBlob(photo, 'image/jpeg', 0.85),
-                    cutout: await toBlob(cut, 'image/png'),
-                    silhouette: await toBlob(sil, 'image/png'),
-                    thumb: await toBlob(thumb, 'image/png'),
-                });
+                // 4まいの がぞうを いっしょに つくる
+                const [photoBlob, cutout, silhouette, thumbBlob] = await Promise.all([
+                    toBlob(photo, 'image/jpeg', 0.85),
+                    toBlob(cut, 'image/png'),
+                    toBlob(sil, 'image/png'),
+                    toBlob(thumb, 'image/png'),
+                ]);
+                await saveQuiz({ id: Date.now(), w, h, box, photo: photoBlob, cutout, silhouette, thumb: thumbBlob });
                 edit.photo = null;
                 toast('できたよ！');
                 openList();
@@ -967,6 +995,9 @@
         // ===== ホーム =====
         $('go-make').addEventListener('click', openCamera);
         $('go-play').addEventListener('click', openList);
+
+        // ひらいたら すぐ AI を よみこみはじめる（タッチしたときに またせない）
+        setTimeout(() => loadSegmenter().catch(() => {}), 500);
     </script>
 </body>
 </html>
