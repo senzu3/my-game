@@ -186,7 +186,8 @@
             height: 100%;
             border-radius: 16px;
         }
-        #mask-canvas {
+        #photo-canvas { touch-action: none; }   /* ゆびで かこむ ときに がめんが うごかないように */
+        #mask-canvas, #lasso-canvas {
             position: absolute;
             inset: 0;
             pointer-events: none;
@@ -371,12 +372,13 @@
     <section class="screen" id="edit">
         <div class="bar">
             <button class="icon-btn" data-home>🏠</button>
-            <div class="msg" id="edit-msg">クイズに する ものを タッチしてね</div>
+            <div class="msg" id="edit-msg">ものを タッチするか、ゆびで ぐるっと かこんでね</div>
         </div>
         <div id="edit-area">
             <div id="edit-wrap">
                 <canvas id="photo-canvas"></canvas>
                 <canvas id="mask-canvas"></canvas>
+                <canvas id="lasso-canvas"></canvas>
                 <div id="tap-mark" hidden></div>
                 <div class="busy" id="edit-busy" hidden><div class="spinner"></div><div id="busy-text">かんがえちゅう…</div></div>
             </div>
@@ -535,8 +537,8 @@
                     const fileset = await FilesetResolver.forVisionTasks(`${MP_BASE}/wasm`);
                     const create = (delegate) => InteractiveSegmenter.createFromOptions(fileset, {
                         baseOptions: { modelAssetPath: MODEL_URL, delegate },
-                        outputCategoryMask: true,
-                        outputConfidenceMasks: false,
+                        outputCategoryMask: false,
+                        outputConfidenceMasks: true,
                     });
                     let segmenter;
                     try { segmenter = await create('GPU'); } catch (e) { segmenter = await create('CPU'); }
@@ -559,13 +561,10 @@
             const w = canvas.width, h = canvas.height;
             return new Promise((resolve) => {
                 segmenter.segment(canvas, { keypoint: { x, y } }, (result) => {
-                    const raw = result.categoryMask.getAsUint8Array();
-                    // もののほうの ばんごうは、タッチした てんの あたいで きめる
-                    const px = Math.min(w - 1, Math.floor(x * w));
-                    const py = Math.min(h - 1, Math.floor(y * h));
-                    const label = raw[py * w + px];
+                    // 0ばんめの マスクが「タッチした もの」らしさ（0〜1）
+                    const conf = result.confidenceMasks[0].getAsFloat32Array();
                     const mask = new Uint8Array(w * h);
-                    for (let i = 0; i < mask.length; i++) mask[i] = raw[i] === label ? 1 : 0;
+                    for (let i = 0; i < mask.length; i++) mask[i] = conf[i] > 0.5 ? 1 : 0;
                     resolve(mask);
                 });
             });
@@ -629,23 +628,31 @@
             }
         });
 
-        // ===== タッチで きりぬき =====
+        // ===== タッチ・かこんで きりぬき =====
         // small: AI に わたす ちいさい しゃしん / silhouette: しゃしんと おなじ おおきさの くろい かたち
-        const edit = { photo: null, small: null, silhouette: null, box: null, busy: false };
+        const edit = { photo: null, silhouette: null, box: null, busy: false, path: null };
+        const TAP_MOVE_PX = 24;   // これより ゆびが うごいたら「かこむ」と みなす
+        const START_MSG = 'ものを タッチするか、ゆびで ぐるっと かこんでね';
+
+        // canvas の メモリを すぐ かえす（iPad は canvas を つかいすぎると がぞうが つくれなくなる）
+        function freeCanvas(c) { if (c) { c.width = 0; c.height = 0; } }
 
         function openEdit(photo) {
             show('edit');
+            freeCanvas(edit.photo);
+            freeCanvas(edit.silhouette);
             edit.photo = photo;
-            edit.small = drawScaled(photo, photo.width, photo.height, SEG_MAX);
             edit.silhouette = null;
-            const pc = $('photo-canvas'), mc = $('mask-canvas');
-            pc.width = mc.width = photo.width;
-            pc.height = mc.height = photo.height;
+            edit.path = null;
+            const pc = $('photo-canvas'), mc = $('mask-canvas'), lc = $('lasso-canvas');
+            pc.width = mc.width = lc.width = photo.width;
+            pc.height = mc.height = lc.height = photo.height;
             pc.getContext('2d').drawImage(photo, 0, 0);
             mc.getContext('2d').clearRect(0, 0, mc.width, mc.height);
+            lc.getContext('2d').clearRect(0, 0, lc.width, lc.height);
             $('tap-mark').hidden = true;
             $('save').hidden = true;
-            $('edit-msg').textContent = 'クイズに する ものを タッチしてね';
+            $('edit-msg').textContent = START_MSG;
             fitEdit();
         }
 
@@ -670,16 +677,74 @@
             if (text) $('busy-text').textContent = text;
         }
 
-        $('photo-canvas').addEventListener('pointerup', async (e) => {
-            if (edit.busy) return;
-            const r = e.currentTarget.getBoundingClientRect();
-            const x = (e.clientX - r.left) / r.width;
-            const y = (e.clientY - r.top) / r.height;
-            if (x < 0 || x > 1 || y < 0 || y > 1) return;
+        // ゆびの いち → しゃしんの ピクセル
+        function toPhoto(e) {
+            const r = $('photo-canvas').getBoundingClientRect();
+            return {
+                x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * edit.photo.width,
+                y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) * edit.photo.height,
+                sx: e.clientX,
+                sy: e.clientY,
+            };
+        }
 
-            $('tap-mark').style.left = `${x * 100}%`;
-            $('tap-mark').style.top = `${y * 100}%`;
-            $('tap-mark').hidden = false;
+        function drawLasso(closed) {
+            const lc = $('lasso-canvas').getContext('2d');
+            const pts = edit.path;
+            lc.clearRect(0, 0, edit.photo.width, edit.photo.height);
+            if (!pts || pts.length < 2) return;
+            const lw = Math.max(4, edit.photo.width / 120);
+            lc.lineJoin = lc.lineCap = 'round';
+            lc.beginPath();
+            pts.forEach((p, i) => (i ? lc.lineTo(p.x, p.y) : lc.moveTo(p.x, p.y)));
+            if (closed) lc.closePath();
+            lc.lineWidth = lw + 4;
+            lc.strokeStyle = 'rgba(0,0,0,0.45)';
+            lc.stroke();
+            lc.lineWidth = lw;
+            lc.strokeStyle = '#ffd34d';
+            lc.stroke();
+        }
+
+        $('photo-canvas').addEventListener('pointerdown', (e) => {
+            if (edit.busy || !edit.photo) return;
+            e.currentTarget.setPointerCapture(e.pointerId);
+            edit.path = [toPhoto(e)];
+            $('lasso-canvas').getContext('2d').clearRect(0, 0, edit.photo.width, edit.photo.height);
+        });
+
+        $('photo-canvas').addEventListener('pointermove', (e) => {
+            if (!edit.path) return;
+            edit.path.push(toPhoto(e));
+            drawLasso(false);
+        });
+
+        $('photo-canvas').addEventListener('pointercancel', () => {
+            edit.path = null;
+            drawLasso(false);
+        });
+
+        $('photo-canvas').addEventListener('pointerup', async (e) => {
+            if (!edit.path) return;
+            const path = edit.path;
+            path.push(toPhoto(e));
+            edit.path = null;
+            const s0 = path[0];
+            const moved = Math.max(...path.map((p) => Math.hypot(p.sx - s0.sx, p.sy - s0.sy)));
+            const lasso = moved >= TAP_MOVE_PX && path.length >= 3 ? path : null;
+            const end = path[path.length - 1];
+
+            if (lasso) {
+                edit.path = lasso;
+                drawLasso(true);
+                edit.path = null;
+                $('tap-mark').hidden = true;
+            } else {
+                drawLasso(false);
+                $('tap-mark').style.left = `${(end.x / edit.photo.width) * 100}%`;
+                $('tap-mark').style.top = `${(end.y / edit.photo.height) * 100}%`;
+                $('tap-mark').hidden = false;
+            }
 
             edit.busy = true;
             const photo = edit.photo;
@@ -687,9 +752,9 @@
             setBusy(segmenterReady ? 'かんがえちゅう…' : 'じゅんび ちゅう…');
             await nextPaint();
             try {
-                const mask = await segmentAt(edit.small, x, y);
+                const result = await cutOut(photo, lasso, end);
                 if (photo !== edit.photo) return;   // とちゅうで とりなおした
-                showMask(mask);
+                showResult(result);
             } catch (err) {
                 toast('インターネットに つないでから もういちど やってね');
             } finally {
@@ -698,20 +763,167 @@
             }
         });
 
-        function showMask(mask) {
-            const { width: sw, height: sh } = edit.small;
+        // しゃしんの rect の ぶぶんを、ながい ほうが max に なるように きりだす
+        function cropScaled(src, rect, max) {
+            const scale = Math.min(1, max / Math.max(rect.w, rect.h));
+            const c = document.createElement('canvas');
+            c.width = Math.max(1, Math.round(rect.w * scale));
+            c.height = Math.max(1, Math.round(rect.h * scale));
+            c.getContext('2d').drawImage(src, rect.x, rect.y, rect.w, rect.h, 0, 0, c.width, c.height);
+            return c;
+        }
+
+        // かこんだ せんの なかを 1 に した ならび（rect の なかを sw×sh に ちぢめた ざひょう）
+        function polygonMask(poly, rect, sw, sh) {
+            const c = document.createElement('canvas');
+            c.width = sw; c.height = sh;
+            const g = c.getContext('2d');
+            const k = sw / rect.w;
+            g.beginPath();
+            poly.forEach((p, i) => {
+                const x = (p.x - rect.x) * k, y = (p.y - rect.y) * k;
+                if (i) g.lineTo(x, y); else g.moveTo(x, y);
+            });
+            g.closePath();
+            g.fill();
+            const a = g.getImageData(0, 0, sw, sh).data;
+            freeCanvas(c);
+            const mask = new Uint8Array(sw * sh);
+            for (let i = 0; i < mask.length; i++) mask[i] = a[i * 4 + 3] > 127 ? 1 : 0;
+            return mask;
+        }
+
+        // seed に つながっている かたまりだけ のこす。seed が かたちの そとなら、radius いないで いちばん ちかい てんから
+        function keepComponent(mask, w, h, sx, sy, radius) {
+            sx = Math.min(w - 1, Math.max(0, Math.round(sx)));
+            sy = Math.min(h - 1, Math.max(0, Math.round(sy)));
+            let seed = -1;
+            if (mask[sy * w + sx]) {
+                seed = sy * w + sx;
+            } else {
+                let best = Infinity;
+                const r = Math.ceil(radius);
+                for (let y = Math.max(0, sy - r); y <= Math.min(h - 1, sy + r); y++) {
+                    for (let x = Math.max(0, sx - r); x <= Math.min(w - 1, sx + r); x++) {
+                        const d = (x - sx) ** 2 + (y - sy) ** 2;
+                        if (mask[y * w + x] && d < best && d <= radius * radius) { best = d; seed = y * w + x; }
+                    }
+                }
+            }
+            if (seed < 0) return null;
+            const out = new Uint8Array(w * h);
+            const stack = new Int32Array(w * h);
+            let top = 0;
+            stack[top++] = seed;
+            out[seed] = 1;
+            while (top) {
+                const i = stack[--top];
+                const x = i % w;
+                const next = [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i - w, i + w];
+                for (const n of next) {
+                    if (n >= 0 && n < w * h && mask[n] && !out[n]) { out[n] = 1; stack[top++] = n; }
+                }
+            }
+            return out;
+        }
+
+        // かたちの なかの ちいさな あなを うめる。
+        // ドーナツや マグカップの とってのような おおきな あなは、かたちの ヒントなので のこす
+        function fillHoles(mask, w, h) {
+            const total = mask.reduce((s, v) => s + v, 0);
+            const maxHole = total * 0.05;
+            const seen = new Uint8Array(w * h);
+            const stack = new Int32Array(w * h);
+            const region = [];
+            for (let start = 0; start < mask.length; start++) {
+                if (mask[start] || seen[start]) continue;
+                // つながった すきまを ひとつ あつめる
+                let top = 0, touchesEdge = false;
+                region.length = 0;
+                seen[start] = 1;
+                stack[top++] = start;
+                while (top) {
+                    const i = stack[--top];
+                    region.push(i);
+                    const x = i % w;
+                    if (x === 0 || x === w - 1 || i < w || i >= w * (h - 1)) touchesEdge = true;
+                    const next = [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i >= w ? i - w : -1, i < w * (h - 1) ? i + w : -1];
+                    for (const n of next) {
+                        if (n >= 0 && !mask[n] && !seen[n]) { seen[n] = 1; stack[top++] = n; }
+                    }
+                }
+                if (!touchesEdge && region.length <= maxHole) region.forEach((i) => { mask[i] = 1; });
+            }
+        }
+
+        // タッチ（lasso = null）か かこみで、もの の かたちを つくる
+        async function cutOut(photo, lasso, tap) {
+            const W = photo.width, H = photo.height;
+            let rect = { x: 0, y: 0, w: W, h: H };
+            if (lasso) {
+                // かこんだ ところだけを AI に みせる（ものが おおきく うつるので まちがえにくい）
+                const xs = lasso.map((p) => p.x), ys = lasso.map((p) => p.y);
+                const m = Math.max(W, H) * 0.04;
+                const x0 = Math.max(0, Math.floor(Math.min(...xs) - m)), y0 = Math.max(0, Math.floor(Math.min(...ys) - m));
+                const x1 = Math.min(W, Math.ceil(Math.max(...xs) + m)), y1 = Math.min(H, Math.ceil(Math.max(...ys) + m));
+                rect = { x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0) };
+            }
+            const input = cropScaled(photo, rect, SEG_MAX);
+            const sw = input.width, sh = input.height, k = sw / rect.w;
+
+            let kx, ky;
+            if (lasso) {
+                kx = lasso.reduce((s, p) => s + p.x, 0) / lasso.length;
+                ky = lasso.reduce((s, p) => s + p.y, 0) / lasso.length;
+            } else {
+                kx = tap.x; ky = tap.y;
+            }
+            kx = (kx - rect.x) * k; ky = (ky - rect.y) * k;
+
+            let mask = await segmentAt(input, Math.min(0.999, kx / sw), Math.min(0.999, ky / sh));
+            freeCanvas(input);
+
+            if (lasso) {
+                const poly = polygonMask(lasso, rect, sw, sh);
+                for (let i = 0; i < mask.length; i++) mask[i] &= poly[i];   // かこみの そとは ぜったいに ぬらない
+                mask = keepComponent(mask, sw, sh, kx, ky, Math.max(sw, sh));
+                const polyCount = poly.reduce((s, v) => s + v, 0);
+                const count = mask ? mask.reduce((s, v) => s + v, 0) : 0;
+                // AI が ほとんど とれなかったら、かこんだ かたちを そのまま つかう
+                if (count < polyCount * 0.15) mask = poly;
+            } else {
+                mask = keepComponent(mask, sw, sh, kx, ky, Math.max(sw, sh) * 0.03);
+            }
+            if (mask) fillHoles(mask, sw, sh);
+            return { mask, sw, sh, rect };
+        }
+
+        function showResult({ mask, sw, sh, rect }) {
             const { width: w, height: h } = edit.photo;
-            const box = maskBox(mask, sw, sh);
-            const area = box ? box.count / (sw * sh) : 0;
+            const box = mask && maskBox(mask, sw, sh);
+            const k = rect.w / sw;
+            const area = box ? (box.count * k * k) / (w * h) : 0;
             const mc = $('mask-canvas').getContext('2d');
             mc.clearRect(0, 0, w, h);
+            freeCanvas(edit.silhouette);
             if (!box || area < 0.003 || area > 0.95) {
                 edit.silhouette = null;
                 $('save').hidden = true;
-                $('edit-msg').textContent = 'うまく とれなかったよ。ほかの ところを タッチしてね';
+                $('edit-msg').textContent = 'うまく とれなかったよ。ゆびで ぐるっと かこんでみてね';
                 return;
             }
-            // ちいさい かたちを しゃしんの おおきさに のばす（ふちも なめらかに なる）
+            const sil = buildSilhouette(mask, sw, sh, rect, w, h);
+            edit.silhouette = sil;
+            edit.box = { x: rect.x + box.x * k, y: rect.y + box.y * k, w: box.w * k, h: box.h * k };
+
+            mc.drawImage(sil, 0, 0);
+            $('save').hidden = false;
+            $('save').disabled = false;
+            $('edit-msg').textContent = 'この かたちで いい？ ちがったら タッチか かこみなおしてね';
+        }
+
+        // ちいさい かたちを しゃしんの おおきさに のばし、まっくろに ぬりつぶす
+        function buildSilhouette(mask, sw, sh, rect, w, h) {
             const small = document.createElement('canvas');
             small.width = sw; small.height = sh;
             small.getContext('2d').putImageData(silhouetteData(mask, sw, sh), 0, 0);
@@ -719,17 +931,14 @@
             sil.width = w; sil.height = h;
             const sc = sil.getContext('2d');
             sc.imageSmoothingQuality = 'high';
-            sc.drawImage(small, 0, 0, w, h);
-            const k = w / sw;
-            edit.silhouette = sil;
-            edit.box = { x: box.x * k, y: box.y * k, w: box.w * k, h: box.h * k };
-
-            mc.globalAlpha = 0.85;
-            mc.drawImage(sil, 0, 0);
-            mc.globalAlpha = 1;
-            $('save').hidden = false;
-            $('save').disabled = false;
-            $('edit-msg').textContent = 'この かたちで いい？ ちがったら タッチしなおしてね';
+            sc.drawImage(small, rect.x, rect.y, rect.w, rect.h);
+            freeCanvas(small);
+            // のばした ときの うすい ふちを なくして、こい くろ だけに する
+            const data = sc.getImageData(0, 0, w, h);
+            const a = data.data;
+            for (let i = 3; i < a.length; i += 4) a[i] = a[i] >= 128 ? 255 : 0;
+            sc.putImageData(data, 0, 0);
+            return sil;
         }
 
         function maskBox(mask, w, h) {
@@ -760,18 +969,23 @@
             canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob'))), type, quality);
         });
 
+        // iPad の Safari は Blob の まま IndexedDB に いれると しっぱい することが あるので、ArrayBuffer に して いれる
+        const packBlob = async (blob) => ({ type: blob.type, data: await blob.arrayBuffer() });
+        const unpackBlob = (v) => (v instanceof Blob ? v : new Blob([v.data], { type: v.type }));
+
         $('save').addEventListener('click', async () => {
             if (!edit.silhouette || edit.busy) return;
             edit.busy = true;
             $('save').disabled = true;
             setBusy('ほぞん ちゅう…');
+            const cut = document.createElement('canvas');
+            const thumb = document.createElement('canvas');
             try {
                 const photo = edit.photo;
                 const { width: w, height: h } = photo;
                 const box = edit.box;
                 const sil = edit.silhouette;
 
-                const cut = document.createElement('canvas');
                 cut.width = w; cut.height = h;
                 const cc = cut.getContext('2d');
                 cc.drawImage(photo, 0, 0);
@@ -781,27 +995,33 @@
                 // いちらん よう：ものの まわりだけ きりとった シルエット
                 const pad = Math.max(box.w, box.h) * 0.08;
                 const side = Math.max(box.w, box.h) + pad * 2;
-                const thumb = document.createElement('canvas');
                 thumb.width = thumb.height = THUMB_SIZE;
                 thumb.getContext('2d').drawImage(sil,
                     box.x + box.w / 2 - side / 2, box.y + box.h / 2 - side / 2, side, side,
                     0, 0, THUMB_SIZE, THUMB_SIZE);
 
                 // 4まいの がぞうを いっしょに つくる
-                const [photoBlob, cutout, silhouette, thumbBlob] = await Promise.all([
+                const blobs = await Promise.all([
                     toBlob(photo, 'image/jpeg', 0.85),
                     toBlob(cut, 'image/png'),
                     toBlob(sil, 'image/png'),
                     toBlob(thumb, 'image/png'),
                 ]);
-                await saveQuiz({ id: Date.now(), w, h, box, photo: photoBlob, cutout, silhouette, thumb: thumbBlob });
+                const [photoData, cutout, silhouette, thumbData] = await Promise.all(blobs.map(packBlob));
+                await saveQuiz({ id: Date.now(), w, h, box, photo: photoData, cutout, silhouette, thumb: thumbData });
+                freeCanvas(edit.photo);
+                freeCanvas(edit.silhouette);
                 edit.photo = null;
+                edit.silhouette = null;
                 toast('できたよ！');
                 openList();
             } catch (err) {
-                toast('ほぞん できませんでした');
+                // せんせいが げんいんを しらべられるように、エラーの なまえも だす
+                toast(`ほぞん できませんでした（${(err && (err.name || err.message)) || 'エラー'}）`);
                 $('save').disabled = false;
             } finally {
+                freeCanvas(cut);
+                freeCanvas(thumb);
                 edit.busy = false;
                 setBusy(null);
             }
@@ -818,7 +1038,13 @@
         async function openList() {
             show('list', freeUrls);
             try {
-                quizzes = (await loadAll()).sort((a, b) => b.id - a.id);
+                quizzes = (await loadAll()).sort((a, b) => b.id - a.id).map((q) => ({
+                    ...q,
+                    photo: unpackBlob(q.photo),
+                    cutout: unpackBlob(q.cutout),
+                    silhouette: unpackBlob(q.silhouette),
+                    thumb: unpackBlob(q.thumb),
+                }));
             } catch (e) {
                 quizzes = [];
                 toast('もんだいを よみこめませんでした');
