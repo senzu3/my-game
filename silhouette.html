@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>これ なーんだ？</title>
+    <style>
+        :root {
+            --bg: #fff8ec;
+            --ink: #3b3b3b;
+            --sub: #7a7266;
+            --card: #ffffff;
+            --line: #eadfcd;
+            --make: #ee9a4d;
+            --play: #4f9fdc;
+            --good: #43a85a;
+            --danger: #e0614f;
+            --focus: #ffd34d;
+            --stage: #fffdf6;
+        }
+
+        * { box-sizing: border-box; }
+        [hidden] { display: none !important; }
+
+        html, body {
+            margin: 0;
+            height: 100%;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: 'Hiragino Maru Gothic ProN', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif; /* やわらかい丸ゴシック */
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;   /* ながおしの メニューを ださない */
+            -webkit-text-size-adjust: 100%;
+            touch-action: manipulation;    /* ダブルタップで かくだい しない */
+            overflow: hidden;
+        }
+
+        button {
+            font-family: inherit;
+            color: inherit;
+            cursor: pointer;
+            border: none;
+        }
+        img { -webkit-user-drag: none; }
+
+        .screen {
+            display: none;
+            position: absolute;
+            inset: 0;
+            flex-direction: column;
+            padding: 16px;
+        }
+        .screen.active { display: flex; }
+
+        .icon-btn {
+            min-width: 64px;
+            height: 64px;
+            border-radius: 20px;
+            background: var(--card);
+            border: 3px solid var(--line);
+            font-size: 30px;
+        }
+
+        .wide-btn {
+            min-height: 72px;
+            padding: 0 32px;
+            border-radius: 24px;
+            background: var(--card);
+            border: 4px solid var(--line);
+            font-size: 28px;
+            font-weight: bold;
+            box-shadow: 0 5px 0 rgba(0,0,0,0.08);
+            transition: transform 0.1s;
+        }
+        .wide-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0,0,0,0.08); }
+        .wide-btn.main { background: var(--good); border-color: var(--good); color: #fff; }
+
+        .bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-height: 64px;
+        }
+        .bar .msg {
+            flex: 1;
+            text-align: center;
+            font-size: clamp(22px, 3.4vw, 30px);
+            font-weight: bold;
+        }
+
+        /* ===== ホーム ===== */
+        #home { align-items: center; justify-content: center; gap: 32px; }
+        #home h1 {
+            margin: 0;
+            font-size: clamp(40px, 7vw, 64px);
+            letter-spacing: 0.08em;
+            text-align: center;
+        }
+        #home h1 small { display: block; font-size: 0.4em; color: var(--sub); letter-spacing: 0.05em; margin-top: 8px; }
+        .menu { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
+        .menu-btn {
+            width: 260px;
+            min-height: 220px;
+            border-radius: 32px;
+            background: var(--card);
+            border: 6px solid;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            box-shadow: 0 6px 0 rgba(0,0,0,0.08);
+            transition: transform 0.1s;
+        }
+        .menu-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,0.08); }
+        .menu-btn .pic { font-size: 72px; line-height: 1; }
+        .menu-btn .name { font-size: 34px; font-weight: bold; }
+        #go-make { border-color: var(--make); }
+        #go-play { border-color: var(--play); }
+
+        /* ===== カメラ ===== */
+        #camera { background: #000; padding: 0; }
+        #video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        #camera .corner { position: absolute; top: 16px; left: 16px; z-index: 2; }
+        #shutter {
+            position: absolute;
+            left: 50%;
+            bottom: 32px;
+            transform: translateX(-50%);
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            background: #fff;
+            border: 10px solid rgba(255,255,255,0.45);
+            background-clip: padding-box;
+            z-index: 2;
+        }
+        #shutter:active { transform: translateX(-50%) scale(0.92); }
+        #cam-error {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            color: #fff;
+            font-size: 28px;
+            font-weight: bold;
+            text-align: center;
+            padding: 24px;
+        }
+        #flash {
+            position: absolute;
+            inset: 0;
+            background: #fff;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 3;
+        }
+        #flash.on { animation: flash 0.35s ease-out; }
+        @keyframes flash { from { opacity: 0.9; } to { opacity: 0; } }
+
+        /* ===== タッチで きりぬき ===== */
+        #edit-area {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 0;
+            margin: 12px 0;
+        }
+        #edit-wrap { position: relative; }
+        #edit-wrap canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border-radius: 16px;
+        }
+        #mask-canvas {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+        #tap-mark {
+            position: absolute;
+            width: 44px;
+            height: 44px;
+            margin: -22px 0 0 -22px;
+            border-radius: 50%;
+            border: 5px solid var(--focus);
+            box-shadow: 0 0 0 3px rgba(0,0,0,0.35);
+            pointer-events: none;
+        }
+        .busy {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            background: rgba(255,248,236,0.75);
+            font-size: 26px;
+            font-weight: bold;
+            border-radius: 16px;
+        }
+        .spinner {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            border: 8px solid var(--line);
+            border-top-color: var(--make);
+            animation: spin 0.9s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .actions { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+
+        /* ===== いちらん ===== */
+        #list-area {
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            margin-top: 12px;
+            padding-bottom: 24px;
+        }
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 16px;
+        }
+        .tile {
+            aspect-ratio: 1;
+            border-radius: 24px;
+            background: var(--stage);
+            border: 4px solid var(--line);
+            padding: 12px;
+            transition: transform 0.15s;
+        }
+        .tile img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+        .tile.pressing { transform: scale(0.94); border-color: var(--danger); }
+        #empty {
+            text-align: center;
+            font-size: 26px;
+            font-weight: bold;
+            color: var(--sub);
+            margin-top: 15vh;
+            line-height: 1.8;
+        }
+
+        /* ===== もんだい ===== */
+        #stage {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            min-height: 0;
+            margin: 12px 0;
+            border-radius: 28px;
+            background: var(--stage);
+            border: 4px solid var(--line);
+        }
+        #frame {
+            position: absolute;
+            transform-origin: 0 0;
+            transition: transform 1s ease-in-out;
+        }
+        #frame img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            transition: opacity 0.8s ease;
+        }
+        #q-photo, #q-cutout { opacity: 0; }
+        #stage.color #q-silhouette { opacity: 0; }
+        #stage.color #q-cutout { opacity: 1; }
+        #stage.photo #q-photo { opacity: 1; }
+        #reveal-msg {
+            position: absolute;
+            left: 50%;
+            top: 16px;
+            transform: translateX(-50%);
+            background: var(--good);
+            color: #fff;
+            font-size: clamp(30px, 5vw, 44px);
+            font-weight: bold;
+            padding: 8px 32px;
+            border-radius: 999px;
+            box-shadow: 0 5px 0 rgba(0,0,0,0.12);
+            animation: pop 0.5s cubic-bezier(.3,1.6,.6,1);
+            white-space: nowrap;
+        }
+        @keyframes pop { from { transform: translateX(-50%) scale(0.3); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
+        #answer { background: var(--make); border-color: var(--make); color: #fff; min-width: 260px; }
+
+        /* ===== かくにん ===== */
+        .overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        .dialog {
+            background: var(--card);
+            border-radius: 28px;
+            padding: 28px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            max-width: 90vw;
+        }
+        .dialog p { margin: 0; font-size: 28px; font-weight: bold; text-align: center; }
+        .dialog img { width: 160px; height: 160px; object-fit: contain; background: var(--stage); border-radius: 20px; }
+        #del-yes { background: var(--danger); border-color: var(--danger); color: #fff; }
+
+        #toast {
+            position: absolute;
+            left: 50%;
+            top: 96px;   /* したの ボタンに かさならないように うえに だす */
+            transform: translateX(-50%);
+            background: rgba(59,59,59,0.92);
+            color: #fff;
+            font-size: 24px;
+            font-weight: bold;
+            padding: 14px 28px;
+            border-radius: 999px;
+            z-index: 20;
+            text-align: center;
+            max-width: 90vw;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ホーム -->
+    <section class="screen active" id="home">
+        <h1>これ なーんだ？<small>シルエット クイズ</small></h1>
+        <div class="menu">
+            <button class="menu-btn" id="go-make"><span class="pic">📷</span><span class="name">つくる</span></button>
+            <button class="menu-btn" id="go-play"><span class="pic">❓</span><span class="name">あそぶ</span></button>
+        </div>
+    </section>
+
+    <!-- カメラ -->
+    <section class="screen" id="camera">
+        <video id="video" playsinline muted autoplay></video>
+        <div class="corner"><button class="icon-btn" data-home>🏠</button></div>
+        <button id="shutter" aria-label="とる"></button>
+        <div id="cam-error" hidden>
+            <div>カメラが つかえません</div>
+            <button class="wide-btn" id="pick-photo">しゃしんから えらぶ</button>
+        </div>
+        <input type="file" id="file-input" accept="image/*" hidden>
+        <div id="flash"></div>
+    </section>
+
+    <!-- タッチで きりぬき -->
+    <section class="screen" id="edit">
+        <div class="bar">
+            <button class="icon-btn" data-home>🏠</button>
+            <div class="msg" id="edit-msg">クイズに する ものを タッチしてね</div>
+        </div>
+        <div id="edit-area">
+            <div id="edit-wrap">
+                <canvas id="photo-canvas"></canvas>
+                <canvas id="mask-canvas"></canvas>
+                <div id="tap-mark" hidden></div>
+                <div class="busy" id="edit-busy" hidden><div class="spinner"></div><div id="busy-text">かんがえちゅう…</div></div>
+            </div>
+        </div>
+        <div class="actions">
+            <button class="wide-btn" id="retake">🔄 とりなおす</button>
+            <button class="wide-btn main" id="save" disabled hidden>⭕ これに する</button>
+        </div>
+    </section>
+
+    <!-- いちらん -->
+    <section class="screen" id="list">
+        <div class="bar">
+            <button class="icon-btn" data-home>🏠</button>
+            <div class="msg">どれに する？</div>
+            <button class="wide-btn" id="play-all">▶ じゅんばんに</button>
+        </div>
+        <div id="list-area">
+            <div id="grid"></div>
+            <div id="empty" hidden>まだ もんだいが ないよ<br>「つくる」で しゃしんを とってね</div>
+        </div>
+    </section>
+
+    <!-- もんだい -->
+    <section class="screen" id="quiz">
+        <div class="bar">
+            <button class="icon-btn" id="quiz-back">◀</button>
+            <div class="msg" id="quiz-msg">これ なーんだ？</div>
+            <div style="min-width:64px"></div>
+        </div>
+        <div id="stage">
+            <div id="frame">
+                <img id="q-photo" alt="">
+                <img id="q-cutout" alt="">
+                <img id="q-silhouette" alt="">
+            </div>
+            <div id="reveal-msg" hidden>これ でした！</div>
+        </div>
+        <div class="actions">
+            <button class="wide-btn" id="answer">こたえ</button>
+            <button class="wide-btn main" id="next" hidden>つぎ ▶</button>
+        </div>
+    </section>
+
+    <!-- けす かくにん -->
+    <div class="overlay" id="del-dialog" hidden>
+        <div class="dialog">
+            <img id="del-thumb" alt="">
+            <p>この もんだいを けしますか？</p>
+            <div class="actions">
+                <button class="wide-btn" id="del-no">けさない</button>
+                <button class="wide-btn" id="del-yes">けす</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" hidden></div>
+
+    <script type="module">
+        // ===== iPadで がめんが かくだい されないように =====
+        // iPadの Safari は user-scalable=no を むしするので、ダブルタップと ピンチを とめる
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            if (now - lastTouchEnd < 350) e.preventDefault();
+            lastTouchEnd = now;
+        }, { passive: false });
+        document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
+        ['gesturestart', 'gesturechange', 'gestureend'].forEach((type) => {
+            document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
+        });
+        document.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 1) e.preventDefault();
+        }, { passive: false });
+
+        // それでも かくだい されたら、ビューポートを かきなおして もとに もどす
+        function resetZoom() {
+            const meta = document.querySelector('meta[name="viewport"]');
+            const base = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+            meta.setAttribute('content', base + ', minimum-scale=1.0');
+            requestAnimationFrame(() => meta.setAttribute('content', base));
+        }
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => {
+                if (window.visualViewport.scale > 1.01) resetZoom();
+            });
+        }
+
+        const $ = (id) => document.getElementById(id);
+
+        const PHOTO_MAX = 1024;   // しゃしんの ながい ほうの おおきさ
+        const THUMB_SIZE = 240;
+        const LONG_PRESS_MS = 800;
+
+        // ===== がめん きりかえ =====
+        let leaveCurrent = null;   // いまの がめんを でるときの かたづけ
+        function show(id, onLeave = null) {
+            if (leaveCurrent) leaveCurrent();
+            leaveCurrent = onLeave;
+            document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id));
+        }
+        document.querySelectorAll('[data-home]').forEach((b) => b.addEventListener('click', () => show('home')));
+
+        let toastTimer = 0;
+        function toast(text) {
+            $('toast').textContent = text;
+            $('toast').hidden = false;
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => { $('toast').hidden = true; }, 2600);
+        }
+
+        // ===== ほぞん（IndexedDB） =====
+        // しゃしんは おおきいので localStorage ではなく IndexedDB に いれる
+        const DB_NAME = 'silhouette-quiz';
+        const STORE = 'quizzes';
+        let dbPromise = null;
+        function openDb() {
+            if (!dbPromise) {
+                dbPromise = new Promise((resolve, reject) => {
+                    const req = indexedDB.open(DB_NAME, 1);
+                    req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: 'id' });
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                });
+                dbPromise.catch(() => { dbPromise = null; });
+            }
+            return dbPromise;
+        }
+        async function dbRun(mode, fn) {
+            const db = await openDb();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(STORE, mode);
+                const req = fn(tx.objectStore(STORE));
+                tx.oncomplete = () => resolve(req && req.result);
+                tx.onerror = () => reject(tx.error);
+                tx.onabort = () => reject(tx.error);
+            });
+        }
+        const loadAll = () => dbRun('readonly', (s) => s.getAll());
+        const saveQuiz = (q) => dbRun('readwrite', (s) => s.put(q));
+        const deleteQuiz = (id) => dbRun('readwrite', (s) => s.delete(id));
+
+        try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+
+        // ===== AI（タッチした ものを きりぬく） =====
+        const MP_VERSION = '0.10.14';
+        const MP_BASE = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}`;
+        const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/interactive_segmenter/magic_touch/float32/1/magic_touch.tflite';
+        let segmenterPromise = null;
+        function loadSegmenter() {
+            if (!segmenterPromise) {
+                segmenterPromise = (async () => {
+                    const { FilesetResolver, InteractiveSegmenter } = await import(`${MP_BASE}/vision_bundle.mjs`);
+                    const fileset = await FilesetResolver.forVisionTasks(`${MP_BASE}/wasm`);
+                    const create = (delegate) => InteractiveSegmenter.createFromOptions(fileset, {
+                        baseOptions: { modelAssetPath: MODEL_URL, delegate },
+                        outputCategoryMask: true,
+                        outputConfidenceMasks: false,
+                    });
+                    try { return await create('GPU'); } catch (e) { return await create('CPU'); }
+                })();
+                segmenterPromise.catch(() => { segmenterPromise = null; });   // しっぱい したら つぎに やりなおす
+            }
+            return segmenterPromise;
+        }
+
+        // タッチした ばしょ (0〜1) の ものの かたちを 0/1 の ならびで かえす
+        async function segmentAt(canvas, x, y) {
+            const segmenter = await loadSegmenter();
+            const w = canvas.width, h = canvas.height;
+            return new Promise((resolve) => {
+                segmenter.segment(canvas, { keypoint: { x, y } }, (result) => {
+                    const raw = result.categoryMask.getAsUint8Array();
+                    // もののほうの ばんごうは、タッチした てんの あたいで きめる
+                    const px = Math.min(w - 1, Math.floor(x * w));
+                    const py = Math.min(h - 1, Math.floor(y * h));
+                    const label = raw[py * w + px];
+                    const mask = new Uint8Array(w * h);
+                    for (let i = 0; i < mask.length; i++) mask[i] = raw[i] === label ? 1 : 0;
+                    resolve(mask);
+                });
+            });
+        }
+
+        // ===== カメラ =====
+        let stream = null;
+        function stopCamera() {
+            if (stream) stream.getTracks().forEach((t) => t.stop());
+            stream = null;
+            $('video').srcObject = null;
+        }
+        async function openCamera() {
+            show('camera', stopCamera);
+            loadSegmenter().catch(() => {});   // とっている あいだに AI を よみこんでおく
+            $('cam-error').hidden = true;
+            $('shutter').hidden = false;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1440 } },
+                    audio: false,
+                });
+                if (!$('camera').classList.contains('active')) { stopCamera(); return; }
+                $('video').srcObject = stream;
+                await $('video').play().catch(() => {});
+            } catch (e) {
+                $('cam-error').hidden = false;
+                $('shutter').hidden = true;
+            }
+        }
+
+        function drawScaled(source, sw, sh) {
+            const scale = Math.min(1, PHOTO_MAX / Math.max(sw, sh));
+            const c = document.createElement('canvas');
+            c.width = Math.round(sw * scale);
+            c.height = Math.round(sh * scale);
+            c.getContext('2d').drawImage(source, 0, 0, c.width, c.height);
+            return c;
+        }
+
+        $('shutter').addEventListener('click', () => {
+            const v = $('video');
+            if (!v.videoWidth) return;
+            $('flash').classList.remove('on');
+            void $('flash').offsetWidth;
+            $('flash').classList.add('on');
+            const photo = drawScaled(v, v.videoWidth, v.videoHeight);
+            setTimeout(() => openEdit(photo), 250);
+        });
+
+        $('pick-photo').addEventListener('click', () => $('file-input').click());
+        $('file-input').addEventListener('change', async () => {
+            const file = $('file-input').files[0];
+            $('file-input').value = '';
+            if (!file) return;
+            try {
+                const bmp = await createImageBitmap(file);
+                openEdit(drawScaled(bmp, bmp.width, bmp.height));
+            } catch (e) {
+                toast('しゃしんを よみこめませんでした');
+            }
+        });
+
+        // ===== タッチで きりぬき =====
+        const edit = { photo: null, mask: null, busy: false };
+
+        function openEdit(photo) {
+            show('edit');
+            edit.photo = photo;
+            edit.mask = null;
+            const pc = $('photo-canvas'), mc = $('mask-canvas');
+            pc.width = mc.width = photo.width;
+            pc.height = mc.height = photo.height;
+            pc.getContext('2d').drawImage(photo, 0, 0);
+            mc.getContext('2d').clearRect(0, 0, mc.width, mc.height);
+            $('tap-mark').hidden = true;
+            $('save').hidden = true;
+            $('edit-msg').textContent = 'クイズに する ものを タッチしてね';
+            fitEdit();
+        }
+
+        // しゃしんを がめんに おさまる おおきさに する
+        function fitEdit() {
+            if (!edit.photo) return;
+            const area = $('edit-area').getBoundingClientRect();
+            const s = Math.min(area.width / edit.photo.width, area.height / edit.photo.height);
+            $('edit-wrap').style.width = `${edit.photo.width * s}px`;
+            $('edit-wrap').style.height = `${edit.photo.height * s}px`;
+        }
+        window.addEventListener('resize', () => { fitEdit(); fitStage(); });
+
+        function setBusy(text) {
+            $('edit-busy').hidden = !text;
+            if (text) $('busy-text').textContent = text;
+        }
+
+        $('photo-canvas').addEventListener('pointerup', async (e) => {
+            if (edit.busy) return;
+            const r = e.currentTarget.getBoundingClientRect();
+            const x = (e.clientX - r.left) / r.width;
+            const y = (e.clientY - r.top) / r.height;
+            if (x < 0 || x > 1 || y < 0 || y > 1) return;
+
+            $('tap-mark').style.left = `${x * 100}%`;
+            $('tap-mark').style.top = `${y * 100}%`;
+            $('tap-mark').hidden = false;
+
+            edit.busy = true;
+            const photo = edit.photo;
+            let ready = false;
+            loadSegmenter().then(() => { ready = true; }, () => {});
+            setTimeout(() => setBusy(ready ? 'かんがえちゅう…' : 'じゅんび ちゅう…'), 0);
+            try {
+                const mask = await segmentAt(photo, x, y);
+                if (photo !== edit.photo) return;   // とちゅうで とりなおした
+                showMask(mask);
+            } catch (err) {
+                toast('インターネットに つないでから もういちど やってね');
+            } finally {
+                edit.busy = false;
+                setBusy(null);
+            }
+        });
+
+        function showMask(mask) {
+            const { width: w, height: h } = edit.photo;
+            const box = maskBox(mask, w, h);
+            const area = box ? box.count / (w * h) : 0;
+            const mc = $('mask-canvas').getContext('2d');
+            if (!box || area < 0.003 || area > 0.95) {
+                edit.mask = null;
+                mc.clearRect(0, 0, w, h);
+                $('save').hidden = true;
+                $('edit-msg').textContent = 'うまく とれなかったよ。ほかの ところを タッチしてね';
+                return;
+            }
+            edit.mask = mask;
+            mc.putImageData(silhouetteData(mask, w, h, 215), 0, 0);
+            $('save').hidden = false;
+            $('save').disabled = false;
+            $('edit-msg').textContent = 'この かたちで いい？ ちがったら タッチしなおしてね';
+        }
+
+        function maskBox(mask, w, h) {
+            let minX = w, minY = h, maxX = -1, maxY = -1, count = 0;
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    if (!mask[y * w + x]) continue;
+                    count++;
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+            }
+            if (!count) return null;
+            return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1, count };
+        }
+
+        function silhouetteData(mask, w, h, alpha = 255) {
+            const data = new ImageData(w, h);
+            for (let i = 0; i < mask.length; i++) {
+                if (mask[i]) data.data[i * 4 + 3] = alpha;   // くろ（rgb は 0 のまま）
+            }
+            return data;
+        }
+
+        const toBlob = (canvas, type, quality) => new Promise((resolve, reject) => {
+            canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob'))), type, quality);
+        });
+
+        $('save').addEventListener('click', async () => {
+            if (!edit.mask || edit.busy) return;
+            edit.busy = true;
+            $('save').disabled = true;
+            setBusy('ほぞん ちゅう…');
+            try {
+                const photo = edit.photo;
+                const { width: w, height: h } = photo;
+                const box = maskBox(edit.mask, w, h);
+
+                const sil = document.createElement('canvas');
+                sil.width = w; sil.height = h;
+                sil.getContext('2d').putImageData(silhouetteData(edit.mask, w, h), 0, 0);
+
+                const cut = document.createElement('canvas');
+                cut.width = w; cut.height = h;
+                const cc = cut.getContext('2d');
+                cc.drawImage(photo, 0, 0);
+                cc.globalCompositeOperation = 'destination-in';
+                cc.drawImage(sil, 0, 0);
+
+                // いちらん よう：ものの まわりだけ きりとった シルエット
+                const pad = Math.max(box.w, box.h) * 0.08;
+                const side = Math.max(box.w, box.h) + pad * 2;
+                const thumb = document.createElement('canvas');
+                thumb.width = thumb.height = THUMB_SIZE;
+                const k = THUMB_SIZE / side;
+                thumb.getContext('2d').drawImage(sil,
+                    box.x + box.w / 2 - side / 2, box.y + box.h / 2 - side / 2, side, side,
+                    0, 0, THUMB_SIZE, THUMB_SIZE);
+
+                await saveQuiz({
+                    id: Date.now(),
+                    w, h,
+                    box: { x: box.x, y: box.y, w: box.w, h: box.h },
+                    photo: await toBlob(photo, 'image/jpeg', 0.85),
+                    cutout: await toBlob(cut, 'image/png'),
+                    silhouette: await toBlob(sil, 'image/png'),
+                    thumb: await toBlob(thumb, 'image/png'),
+                });
+                edit.photo = null;
+                toast('できたよ！');
+                openList();
+            } catch (err) {
+                toast('ほぞん できませんでした');
+                $('save').disabled = false;
+            } finally {
+                edit.busy = false;
+                setBusy(null);
+            }
+        });
+
+        $('retake').addEventListener('click', () => { if (!edit.busy) openCamera(); });
+
+        // ===== いちらん =====
+        let quizzes = [];
+        let urls = [];
+        const makeUrl = (blob) => { const u = URL.createObjectURL(blob); urls.push(u); return u; };
+        function freeUrls() { urls.forEach((u) => URL.revokeObjectURL(u)); urls = []; }
+
+        async function openList() {
+            show('list', freeUrls);
+            try {
+                quizzes = (await loadAll()).sort((a, b) => b.id - a.id);
+            } catch (e) {
+                quizzes = [];
+                toast('もんだいを よみこめませんでした');
+            }
+            renderGrid();
+        }
+
+        function renderGrid() {
+            freeUrls();
+            const grid = $('grid');
+            grid.innerHTML = '';
+            $('empty').hidden = quizzes.length > 0;
+            $('play-all').hidden = quizzes.length === 0;
+            quizzes.forEach((q, i) => {
+                const tile = document.createElement('button');
+                tile.className = 'tile';
+                const img = document.createElement('img');
+                img.src = makeUrl(q.thumb);
+                img.alt = '';
+                tile.appendChild(img);
+                addPressHandlers(tile, () => openQuiz(i, false), () => askDelete(q, img.src));
+                grid.appendChild(tile);
+            });
+        }
+
+        // タップで ひらく・ながおしで けす
+        function addPressHandlers(el, onTap, onLong) {
+            let timer = 0, start = null, fired = false;
+            const cancel = () => { clearTimeout(timer); start = null; el.classList.remove('pressing'); };
+            el.addEventListener('pointerdown', (e) => {
+                fired = false;
+                start = { x: e.clientX, y: e.clientY };
+                timer = setTimeout(() => {
+                    fired = true;
+                    cancel();
+                    onLong();
+                }, LONG_PRESS_MS);
+                setTimeout(() => { if (start) el.classList.add('pressing'); }, 250);
+            });
+            el.addEventListener('pointermove', (e) => {
+                if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 12) cancel();
+            });
+            el.addEventListener('pointerup', () => {
+                const wasPressing = start !== null;
+                cancel();
+                if (wasPressing && !fired) onTap();
+            });
+            el.addEventListener('pointercancel', cancel);
+            el.addEventListener('pointerleave', cancel);
+            el.addEventListener('contextmenu', (e) => e.preventDefault());
+        }
+
+        let deleting = null;
+        function askDelete(q, thumbUrl) {
+            deleting = q;
+            $('del-thumb').src = thumbUrl;
+            $('del-dialog').hidden = false;
+        }
+        $('del-no').addEventListener('click', () => { $('del-dialog').hidden = true; deleting = null; });
+        $('del-yes').addEventListener('click', async () => {
+            $('del-dialog').hidden = true;
+            if (!deleting) return;
+            const id = deleting.id;
+            deleting = null;
+            try {
+                await deleteQuiz(id);
+                quizzes = quizzes.filter((q) => q.id !== id);
+                renderGrid();
+            } catch (e) {
+                toast('けせませんでした');
+            }
+        });
+
+        $('play-all').addEventListener('click', () => { if (quizzes.length) openQuiz(0, true); });
+
+        // ===== もんだい =====
+        const quiz = { index: 0, series: false, urls: [], timer: 0 };
+        function freeQuiz() {
+            clearTimeout(quiz.timer);
+            quiz.urls.forEach((u) => URL.revokeObjectURL(u));
+            quiz.urls = [];
+        }
+
+        function openQuiz(index, series) {
+            if (!$('quiz').classList.contains('active')) show('quiz', freeQuiz);
+            freeQuiz();
+            quiz.index = index;
+            quiz.series = series;
+            const q = quizzes[index];
+            const set = (id, blob) => { const u = URL.createObjectURL(blob); quiz.urls.push(u); $(id).src = u; };
+            set('q-photo', q.photo);
+            set('q-cutout', q.cutout);
+            set('q-silhouette', q.silhouette);
+
+            $('stage').classList.remove('color', 'photo');
+            $('reveal-msg').hidden = true;
+            $('answer').hidden = false;
+            $('next').hidden = true;
+            $('quiz-msg').textContent = series ? `これ なーんだ？（${index + 1} / ${quizzes.length}）` : 'これ なーんだ？';
+
+            // すぐに ズームした いちに おく（うごきなし）
+            $('frame').style.transition = 'none';
+            fitStage();
+            void $('frame').offsetWidth;
+            $('frame').style.transition = '';
+        }
+
+        // シルエットを ものの おおきさに あわせて ズームする。しゃしんを みせるときは ぜんたいに もどす
+        function fitStage() {
+            const q = quizzes[quiz.index];
+            if (!q || !$('quiz').classList.contains('active')) return;
+            const stage = $('stage').getBoundingClientRect();
+            const sw = stage.width - 8, sh = stage.height - 8;   // わく の ぶん
+            const base = Math.min(sw / q.w, sh / q.h);
+            const fw = q.w * base, fh = q.h * base;
+            const frame = $('frame');
+            frame.style.width = `${fw}px`;
+            frame.style.height = `${fh}px`;
+            frame.style.left = `${(sw - fw) / 2}px`;
+            frame.style.top = `${(sh - fh) / 2}px`;
+
+            if ($('stage').classList.contains('photo')) {
+                frame.style.transform = 'none';
+                return;
+            }
+            const b = q.box;
+            const zoom = Math.min(4, Math.max(1, Math.min(fw / (b.w * base), fh / (b.h * base)) * 0.85));
+            const cx = (b.x + b.w / 2) * base, cy = (b.y + b.h / 2) * base;
+            const tx = fw / 2 - zoom * cx, ty = fh / 2 - zoom * cy;
+            frame.style.transform = `translate(${tx}px, ${ty}px) scale(${zoom})`;
+        }
+
+        $('answer').addEventListener('click', () => {
+            $('answer').hidden = true;
+            $('stage').classList.add('color');
+            playChime();
+            quiz.timer = setTimeout(() => {
+                $('stage').classList.add('photo');
+                fitStage();
+                $('reveal-msg').hidden = false;
+                const last = quiz.index >= quizzes.length - 1;
+                $('next').textContent = quiz.series && !last ? 'つぎ ▶' : 'おわり';
+                $('next').hidden = false;
+            }, 1500);
+        });
+
+        $('next').addEventListener('click', () => {
+            if (quiz.series && quiz.index < quizzes.length - 1) openQuiz(quiz.index + 1, true);
+            else openList();
+        });
+        $('quiz-back').addEventListener('click', openList);
+
+        // せいかいの おと（ファイルを つかわず その場で つくる）
+        let audio = null;
+        function playChime() {
+            try {
+                audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+                const t0 = audio.currentTime;
+                [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+                    const o = audio.createOscillator(), g = audio.createGain();
+                    o.type = 'triangle';
+                    o.frequency.value = f;
+                    const t = t0 + i * 0.11;
+                    g.gain.setValueAtTime(0, t);
+                    g.gain.linearRampToValueAtTime(0.25, t + 0.02);
+                    g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+                    o.connect(g).connect(audio.destination);
+                    o.start(t);
+                    o.stop(t + 0.55);
+                });
+            } catch (e) {}
+        }
+
+        // ===== ホーム =====
+        $('go-make').addEventListener('click', openCamera);
+        $('go-play').addEventListener('click', openList);
+    </script>
+</body>
+</html>
