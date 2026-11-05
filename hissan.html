@@ -996,7 +996,7 @@
                 .replace(/＋/g, ' たす ')
                 .replace(/＝/g, ' は ')
                 .replace(/[？?！!]/g, '')
-                .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '');
+                .replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, ''); // ⭐ なども よまない
         }
         function speak(text) {
             if (!state.sound || !('speechSynthesis' in window)) return;
@@ -1652,7 +1652,10 @@
             if (isNew) msg += ' 📖 ずかんに とうろく！';
             if (heroLevel(save.xp) > lvOld) msg += ` ゆうしゃが レベル ${heroLevel(save.xp)}に なった！`;
             say(msg);
-            speak(msg);
+            // よみあげは だいじな ところだけ（こたえ・やっつけた・レベルアップ）
+            let talk = `こたえは ${P.answerText}。${P.monster.name}を やっつけた！`;
+            if (heroLevel(save.xp) > lvOld) talk += ` ゆうしゃが レベル ${heroLevel(save.xp)}に なった！`;
+            speak(talk);
             renderDots();
             $('next-btn').textContent = P.boss ? 'けっかを みる ▶' : 'つぎへ ▶';
             await waitButton('next-btn');
