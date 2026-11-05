@@ -1,0 +1,1728 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>ひっさん モンスターバトル</title>
+    <style>
+        :root {
+            --bg: #fff8ec;
+            --ink: #3b3b3b;
+            --sub: #7a7266;
+            --card: #ffffff;
+            --line: #eadfcd;
+            --good: #43a85a;
+            --focus: #ffd34d;
+            --mul: #3f8fe0;
+            --div: #ee8a3d;
+            --c-tateru: #e07b00;
+            --c-kakeru: #2f7bd8;
+            --c-hiku: #d9434b;
+            --c-orosu: #8a4fd0;
+            --c-tasu: #2a9d55;
+            --cell: 56px;
+        }
+
+        * { box-sizing: border-box; }
+        [hidden] { display: none !important; }
+
+        html, body {
+            margin: 0;
+            height: 100%;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: 'Hiragino Maru Gothic ProN', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-text-size-adjust: 100%;
+            touch-action: manipulation;
+            overflow: hidden;
+        }
+
+        button {
+            font-family: inherit;
+            color: inherit;
+            cursor: pointer;
+            border: none;
+        }
+
+        .screen {
+            display: none;
+            position: absolute;
+            inset: 0;
+            flex-direction: column;
+            padding: 16px;
+        }
+        .screen.active { display: flex; }
+
+        .icon-btn {
+            min-width: 64px;
+            height: 64px;
+            border-radius: 20px;
+            background: var(--card);
+            border: 3px solid var(--line);
+            font-size: 30px;
+            flex-shrink: 0;
+        }
+
+        .wide-btn {
+            min-height: 72px;
+            padding: 0 32px;
+            border-radius: 24px;
+            background: var(--good);
+            color: #fff;
+            font-size: 28px;
+            font-weight: bold;
+            box-shadow: 0 6px 0 #2f7d41;
+        }
+        .wide-btn.sub { background: var(--card); color: var(--ink); border: 3px solid var(--line); box-shadow: 0 6px 0 var(--line); }
+        .wide-btn:active { transform: translateY(4px); box-shadow: none; }
+
+        /* ===== タイトル ===== */
+        #title { align-items: center; gap: 14px; overflow-y: auto; }
+        #title .corner { position: absolute; top: 16px; right: 16px; }
+        #title h1 {
+            margin: 8px 0 0;
+            font-size: clamp(32px, 5.5vw, 54px);
+            letter-spacing: 0.06em;
+            text-align: center;
+        }
+        #title h1 small { display: block; font-size: 0.42em; color: var(--sub); margin-top: 4px; letter-spacing: 0.04em; }
+        .title-hero { display: flex; align-items: flex-end; gap: 10px; height: 110px; }
+        .title-hero svg { height: 110px; width: auto; }
+        #resume-btn { background: var(--focus); color: var(--ink); box-shadow: 0 6px 0 #d8a91d; }
+
+        .levels {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            width: min(100%, 860px);
+        }
+        .op-col { display: flex; flex-direction: column; gap: 12px; }
+        .op-head {
+            text-align: center;
+            font-size: 28px;
+            font-weight: bold;
+            padding: 6px;
+            border-radius: 18px;
+            color: #fff;
+        }
+        .op-col.mul .op-head { background: var(--mul); }
+        .op-col.div .op-head { background: var(--div); }
+        .level-btn {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-height: 84px;
+            padding: 10px 14px;
+            border-radius: 22px;
+            background: var(--card);
+            border: 4px solid var(--line);
+            box-shadow: 0 6px 0 var(--line);
+            text-align: left;
+        }
+        .level-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--line); }
+        .level-btn .num {
+            flex-shrink: 0;
+            width: 52px; height: 52px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 30px; font-weight: bold; color: #fff;
+        }
+        .op-col.mul .num { background: var(--mul); }
+        .op-col.div .num { background: var(--div); }
+        .level-btn .txt { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+        .level-btn .t1 { font-size: 24px; font-weight: bold; }
+        .level-btn .t2 { font-size: 17px; color: var(--sub); }
+        .level-btn .crown { font-size: 34px; }
+        .level-btn .crown.off { filter: grayscale(1); opacity: 0.18; }
+
+        .title-links { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; padding-bottom: 12px; }
+
+        /* ===== バトル ===== */
+        #battle { padding: 12px; gap: 10px; }
+        .topbar { display: flex; align-items: center; gap: 12px; }
+        .dots { flex: 1; display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .dot {
+            width: 24px; height: 24px; border-radius: 50%;
+            background: var(--line);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px;
+        }
+        .dot.done { background: var(--good); }
+        .dot.now { box-shadow: 0 0 0 4px var(--focus); }
+        .dot.boss { width: 34px; height: 34px; font-size: 22px; background: #f3e6c8; }
+        .dot.boss.done { background: var(--good); }
+
+        .battle-main {
+            flex: 1;
+            min-height: 0;
+            display: grid;
+            gap: 12px;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+        }
+        @media (orientation: portrait), (max-width: 760px) {
+            .battle-main { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(200px, 33%) minmax(0, 1fr); }
+        }
+
+        .stage {
+            position: relative;
+            border-radius: 26px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: linear-gradient(#bfe3ff, #eaf6ff 58%, #cfeccb 58%, #b2dca9);
+            border: 4px solid #fff;
+            box-shadow: 0 4px 0 var(--line);
+        }
+        .stage.div-stage { background: linear-gradient(#ffd9b8, #fff1e2 58%, #f1dfb6 58%, #e3cb94); }
+        .stage.boss-stage { background: linear-gradient(#3b2d5c, #6b4f8f 58%, #4a3a52 58%, #2f2536); }
+        .stage.boss-stage .mon-name { color: #fff; }
+
+        .mon-head { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 16px 0; z-index: 2; }
+        .mon-name { font-size: 22px; font-weight: bold; }
+        .hp {
+            width: min(80%, 320px);
+            height: 18px;
+            border-radius: 9px;
+            background: rgba(0,0,0,0.15);
+            border: 3px solid #fff;
+            overflow: hidden;
+        }
+        .hp > div { height: 100%; width: 100%; background: linear-gradient(#ff6b6b, #e23d3d); transition: width 0.25s; }
+
+        .mon-wrap {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        #monster { height: 88%; max-height: 300px; aspect-ratio: 1; display: flex; }
+        #monster svg { width: 100%; height: 100%; overflow: visible; }
+        #monster.boss { max-height: 360px; height: 96%; }
+        #monster.idle svg { animation: bob 1.6s ease-in-out infinite; }
+        @keyframes bob { 50% { transform: translateY(-6px) scale(1.02, 0.98); } }
+        #monster.hit svg { animation: hit 0.28s; }
+        @keyframes hit {
+            0% { transform: translateX(0); filter: brightness(2.2); }
+            30% { transform: translateX(14px) rotate(4deg); }
+            60% { transform: translateX(-10px) rotate(-3deg); filter: brightness(1.4); }
+            100% { transform: translateX(0); filter: none; }
+        }
+        #monster.dodge svg { animation: dodge 0.5s; }
+        @keyframes dodge { 40% { transform: translateX(-60px) rotate(-8deg); } 100% { transform: translateX(0); } }
+        #monster.guard svg { animation: guard 0.7s; }
+        @keyframes guard {
+            0% { transform: scale(1); }
+            30% { transform: scale(1.18); filter: drop-shadow(0 0 20px #fff) brightness(1.3); }
+            100% { transform: scale(1); }
+        }
+        #monster.defeat svg { animation: defeat 0.9s forwards; }
+        @keyframes defeat {
+            0% { transform: scale(1); filter: brightness(3); }
+            40% { transform: scale(1.2, 0.7) rotate(-6deg); }
+            100% { transform: scale(0) rotate(40deg); opacity: 0; }
+        }
+        #monster.appear svg { animation: appear 0.6s cubic-bezier(.3,1.6,.5,1); }
+        @keyframes appear { 0% { transform: scale(0) translateY(40px); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+
+        .hero-wrap { position: absolute; left: 10px; bottom: 6px; height: 34%; max-height: 130px; z-index: 2; }
+        .hero-wrap svg { height: 100%; width: auto; }
+        .hero-wrap.attack svg { animation: attack 0.25s; }
+        @keyframes attack { 50% { transform: translateX(18px) rotate(8deg); } }
+
+        .combo {
+            position: absolute; top: 12px; right: 14px; z-index: 3;
+            font-size: 22px; font-weight: bold;
+            color: #e8590c;
+            background: rgba(255,255,255,0.85);
+            padding: 4px 12px;
+            border-radius: 14px;
+            transition: transform 0.15s;
+        }
+        .combo.pop { transform: scale(1.35); }
+
+        .bubble {
+            margin: 0 10px 10px;
+            margin-left: min(130px, 26%);
+            min-height: 58px;
+            padding: 10px 16px;
+            border-radius: 18px;
+            background: rgba(255,255,255,0.94);
+            font-size: 22px;
+            font-weight: bold;
+            line-height: 1.35;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+        }
+
+        .work { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+        .chips { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+        .chip {
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 20px;
+            font-weight: bold;
+            background: var(--card);
+            border: 3px solid var(--line);
+            color: var(--sub);
+        }
+        .chip.arrow { border: none; background: none; padding: 6px 0; }
+        .chip.on { color: #fff; border-color: transparent; transform: scale(1.1); }
+        .chip.on[data-label="たてる"] { background: var(--c-tateru); }
+        .chip.on[data-label="かける"] { background: var(--c-kakeru); }
+        .chip.on[data-label="くりあがり"] { background: var(--c-kakeru); }
+        .chip.on[data-label="ひく"] { background: var(--c-hiku); }
+        .chip.on[data-label="おろす"] { background: var(--c-orosu); }
+        .chip.on[data-label="たす"] { background: var(--c-tasu); }
+
+        .board {
+            flex: 1;
+            min-height: 0;
+            border-radius: 24px;
+            background-color: #fff;
+            background-image:
+                linear-gradient(rgba(120,160,220,0.08) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(120,160,220,0.08) 1px, transparent 1px);
+            background-size: 24px 24px;
+            border: 4px solid var(--line);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            overflow: hidden;
+        }
+        .grid { display: flex; flex-direction: column; }
+        .grow { display: flex; }
+        .cell {
+            width: var(--cell);
+            height: var(--cell);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: calc(var(--cell) * 0.72);
+            font-weight: bold;
+            position: relative;
+            border-radius: 10px;
+            font-variant-numeric: tabular-nums;
+        }
+        .grow.small .cell { height: calc(var(--cell) * 0.5); font-size: calc(var(--cell) * 0.4); }
+        .cell.ul { border-bottom: 4px solid var(--ink); border-radius: 0; }
+        .cell.top { border-top: 4px solid var(--ink); border-radius: 0; }
+        .cell.sign { color: var(--ink); }
+        .cell.bracket::after {
+            content: '';
+            position: absolute;
+            right: 8%;
+            top: -6%;
+            width: 38%;
+            height: 108%;
+            border-right: 4px solid var(--ink);
+            border-top: 4px solid transparent;
+            border-radius: 0 0 70% 0 / 0 0 40% 0;
+        }
+        .cell.faint { color: #b8b0a2; }
+        .cell.trial { color: var(--c-tateru); outline: 3px dashed var(--c-tateru); outline-offset: -6px; }
+        .cell.current {
+            background: #fff3b8;
+            box-shadow: inset 0 0 0 4px var(--focus);
+            animation: glow 1s ease-in-out infinite;
+        }
+        .cell.current.ul, .cell.current.top { border-radius: 0; }
+        @keyframes glow { 50% { box-shadow: inset 0 0 0 4px #ffb703; } }
+        .cell.current[data-hint]::before {
+            content: attr(data-hint);
+            color: rgba(0,0,0,0.18);
+            position: absolute;
+        }
+        .cell.shake { animation: shake 0.4s; }
+        @keyframes shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+        .cell.pop { animation: cellpop 0.25s; }
+        @keyframes cellpop { 50% { transform: scale(1.35); } }
+        .cell[data-l="たてる"] { color: var(--c-tateru); }
+        .cell[data-l="かける"], .cell[data-l="くりあがり"] { color: var(--c-kakeru); }
+        .cell[data-l="ひく"] { color: var(--c-hiku); }
+        .cell[data-l="おろす"] { color: var(--c-orosu); }
+        .cell[data-l="たす"] { color: var(--c-tasu); }
+
+        .guide {
+            min-height: 46px;
+            text-align: center;
+            font-size: 26px;
+            font-weight: bold;
+            color: var(--ink);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .guide .tag { font-size: 18px; color: #fff; background: var(--sub); border-radius: 10px; padding: 2px 10px; }
+        .guide.strong { color: #c2410c; }
+
+        .pad { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+        .pad button {
+            height: clamp(58px, 9vh, 86px);
+            font-size: 40px;
+            font-weight: bold;
+            border-radius: 18px;
+            background: var(--card);
+            border: 3px solid var(--line);
+            box-shadow: 0 5px 0 var(--line);
+        }
+        .pad button.down { transform: translateY(4px); box-shadow: 0 1px 0 var(--line); background: #fff6d6; }
+        .action-area { display: flex; justify-content: center; align-items: center; min-height: calc(clamp(58px, 9vh, 86px) * 2 + 8px); }
+        .action-area .wide-btn { font-size: 32px; min-height: 96px; padding: 0 48px; }
+        #fix-btn { background: var(--c-tateru); box-shadow: 0 6px 0 #a85a00; }
+
+        /* ひっさつわざ */
+        .flash {
+            position: fixed; inset: 0; z-index: 50;
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: none;
+            background: radial-gradient(circle, rgba(255,255,255,0.95), rgba(255,230,120,0.6) 60%, rgba(255,200,0,0));
+            animation: flash 1.1s forwards;
+        }
+        .flash span {
+            font-size: clamp(40px, 7vw, 76px);
+            font-weight: bold;
+            color: #e8590c;
+            text-shadow: 0 4px 0 #fff, 0 0 30px #fff;
+            animation: movename 1.1s forwards;
+        }
+        @keyframes flash { 0% { opacity: 0; } 15% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
+        @keyframes movename { 0% { transform: scale(0.4) rotate(-6deg); } 25% { transform: scale(1.1) rotate(0); } 100% { transform: scale(1); } }
+
+        .particle { position: fixed; z-index: 40; font-size: 34px; pointer-events: none; left: 0; top: 0; }
+        .dmg {
+            position: absolute; z-index: 5;
+            font-size: 34px; font-weight: bold; color: #fff;
+            text-shadow: 0 0 6px #e8590c, 0 3px 0 #c2410c;
+            pointer-events: none;
+            animation: dmg 0.8s forwards;
+        }
+        @keyframes dmg { 0% { transform: translateY(0) scale(0.6); opacity: 1; } 30% { transform: translateY(-20px) scale(1.2); } 100% { transform: translateY(-60px); opacity: 0; } }
+        .shake-screen { animation: shakescreen 0.5s; }
+        @keyframes shakescreen { 20% { transform: translate(-8px, 4px); } 40% { transform: translate(8px, -4px); } 60% { transform: translate(-6px, 2px); } 80% { transform: translate(6px, 0); } }
+
+        /* ===== けっか ===== */
+        #result { align-items: center; justify-content: center; gap: 16px; overflow-y: auto; }
+        #result h2 { margin: 0; font-size: clamp(36px, 6vw, 60px); }
+        .result-stars { font-size: 34px; font-weight: bold; }
+        .result-mons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 760px; }
+        .result-mons svg { width: 76px; height: 76px; }
+        .result-notes { display: flex; flex-direction: column; gap: 8px; align-items: center; font-size: 24px; font-weight: bold; }
+        .result-notes div { background: var(--card); border: 3px solid var(--line); border-radius: 16px; padding: 8px 18px; }
+        .result-btns { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+
+        /* ===== ずかん ===== */
+        #zukan, #hero { gap: 12px; }
+        .page-head { display: flex; align-items: center; gap: 16px; }
+        .page-head h2 { margin: 0; font-size: 32px; flex: 1; }
+        .zukan-grid {
+            flex: 1;
+            overflow-y: auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+            align-content: start;
+            padding-bottom: 20px;
+        }
+        .zcard {
+            background: var(--card);
+            border: 3px solid var(--line);
+            border-radius: 20px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+        }
+        .zcard svg { width: 100%; max-width: 120px; aspect-ratio: 1; }
+        .zcard.unknown svg { filter: brightness(0) opacity(0.25); }
+        .zcard .zname { font-size: 17px; font-weight: bold; text-align: center; }
+        .zcard .zsub { font-size: 14px; color: var(--sub); }
+        .zcard.boss { border-color: #f0c040; background: #fffaf0; }
+        .zsection { grid-column: 1 / -1; font-size: 22px; font-weight: bold; padding: 8px 4px 0; }
+
+        .hero-page { flex: 1; display: flex; align-items: center; justify-content: center; gap: 32px; flex-wrap: wrap; overflow-y: auto; }
+        .hero-big svg { height: min(48vh, 380px); width: auto; }
+        .hero-info { display: flex; flex-direction: column; gap: 14px; font-size: 24px; max-width: 420px; }
+        .hero-info .lv { font-size: 44px; font-weight: bold; }
+        .xpbar { height: 24px; border-radius: 12px; background: var(--line); overflow: hidden; }
+        .xpbar > div { height: 100%; background: linear-gradient(90deg, #ffd34d, #ff9f1c); }
+        .hero-info .records { font-size: 19px; background: var(--card); border: 3px solid var(--line); border-radius: 16px; padding: 10px 14px; line-height: 1.6; }
+    </style>
+</head>
+<body>
+
+    <!-- タイトル -->
+    <section class="screen active" id="title">
+        <div class="corner"><button class="icon-btn sound-btn" aria-label="おと">🔊</button></div>
+        <h1>ひっさん モンスターバトル<small>ひっさんで モンスターを やっつけよう！</small></h1>
+        <div class="title-hero" id="title-hero"></div>
+        <button class="wide-btn" id="resume-btn" hidden></button>
+        <div class="levels" id="levels"></div>
+        <div class="title-links">
+            <button class="wide-btn sub" id="to-zukan">📖 ずかん</button>
+            <button class="wide-btn sub" id="to-hero">🛡️ ゆうしゃ</button>
+        </div>
+    </section>
+
+    <!-- バトル -->
+    <section class="screen" id="battle">
+        <div class="topbar">
+            <button class="icon-btn" id="home-btn" aria-label="ホーム">🏠</button>
+            <div class="dots" id="dots"></div>
+            <button class="icon-btn sound-btn" aria-label="おと">🔊</button>
+        </div>
+        <div class="battle-main">
+            <div class="stage" id="stage">
+                <div class="combo" id="combo" hidden></div>
+                <div class="mon-head">
+                    <div class="mon-name" id="mon-name"></div>
+                    <div class="hp"><div id="hp-bar"></div></div>
+                </div>
+                <div class="mon-wrap" id="mon-wrap">
+                    <div id="monster"></div>
+                </div>
+                <div class="hero-wrap" id="hero-wrap"></div>
+                <div class="bubble" id="bubble"></div>
+            </div>
+            <div class="work">
+                <div class="chips" id="chips"></div>
+                <div class="board" id="board"><div class="grid" id="grid"></div></div>
+                <div class="guide" id="guide"></div>
+                <div class="pad" id="pad"></div>
+                <div class="action-area" id="action-area" hidden>
+                    <button class="wide-btn" id="fix-btn"></button>
+                    <button class="wide-btn" id="next-btn">つぎへ ▶</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- けっか -->
+    <section class="screen" id="result">
+        <h2 id="result-title">クリア！</h2>
+        <div class="result-stars" id="result-stars"></div>
+        <div class="result-mons" id="result-mons"></div>
+        <div class="result-notes" id="result-notes"></div>
+        <div class="result-btns">
+            <button class="wide-btn" id="again-btn">もういちど</button>
+            <button class="wide-btn sub" id="to-title">レベルを えらぶ</button>
+        </div>
+    </section>
+
+    <!-- ずかん -->
+    <section class="screen" id="zukan">
+        <div class="page-head">
+            <button class="icon-btn back-btn" aria-label="もどる">🏠</button>
+            <h2 id="zukan-title">ずかん</h2>
+        </div>
+        <div class="zukan-grid" id="zukan-grid"></div>
+    </section>
+
+    <!-- ゆうしゃ -->
+    <section class="screen" id="hero">
+        <div class="page-head">
+            <button class="icon-btn back-btn" aria-label="もどる">🏠</button>
+            <h2>ゆうしゃ</h2>
+        </div>
+        <div class="hero-page">
+            <div class="hero-big" id="hero-big"></div>
+            <div class="hero-info" id="hero-info"></div>
+        </div>
+    </section>
+
+    <script>
+        // ===== ENGINE START =====
+        // もんだいづくりと、ひっさんの てじゅん（どのマスに なにを いれるか）を きめる ぶぶん。
+        // DOM を さわらないので、node でも テストできる。
+
+        const rand = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
+        const len = (n) => String(n).length;
+        const dig = (n, c) => Math.floor(n / Math.pow(10, c)) % 10; // みぎから c ばんめの くらいの かず
+
+        const LEVELS = {
+            mul: [
+                { lv: 1, title: '2けた × 1けた', sub: 'くりあがり なし', normal: 7 },
+                { lv: 2, title: '2〜3けた × 1けた', sub: 'くりあがり あり', normal: 7 },
+                { lv: 3, title: '2けた × 2けた', sub: 'たしざんで まとめる', normal: 4 },
+                { lv: 4, title: '3けた × 2けた', sub: 'ながい ひっさん', normal: 4 }
+            ],
+            div: [
+                { lv: 1, title: '2けた ÷ 1けた', sub: 'あまり なし', normal: 7 },
+                { lv: 2, title: '2〜3けた ÷ 1けた', sub: 'あまり あり', normal: 7 },
+                { lv: 3, title: '÷ 2けた', sub: 'みとおしが あたる', normal: 4 },
+                { lv: 4, title: '÷ 2けた', sub: 'しょうを なおす', normal: 4 }
+            ]
+        };
+
+        // ===== もんだいを つくる =====
+        function mulCarries(a, d) {
+            const out = [];
+            let c = 0;
+            for (let i = 0; i < len(a); i++) {
+                const p = d * dig(a, i) + c;
+                c = Math.floor(p / 10);
+                out.push(c);
+            }
+            return out;
+        }
+
+        function genMul(level, boss) {
+            for (let t = 0; t < 20000; t++) {
+                let a, b;
+                if (level === 1) {
+                    b = rand(2, 9);
+                    const m = Math.floor(9 / b);
+                    if (m === 1 && !boss && Math.random() < 0.85) continue; // 11×9 ばかりに ならないように
+                    a = 0;
+                    for (let i = 0; i < (boss ? 3 : 2); i++) a = a * 10 + rand(1, m);
+                    return { a, b };
+                }
+                if (level === 2) {
+                    b = rand(2, 9);
+                    a = (boss || Math.random() < 0.5) ? rand(101, 999) : rand(12, 99);
+                    if (a % 10 === 0) continue;
+                    const inner = mulCarries(a, b).slice(0, -1);
+                    if (boss ? !inner.every((c) => c > 0) : !inner.some((c) => c > 0)) continue;
+                    return { a, b };
+                }
+                a = level === 3 ? rand(12, 99) : rand(102, 999);
+                b = rand(12, 99);
+                if (a % 10 === 0 || b % 10 === 0) continue;
+                if (boss) {
+                    if (!mulCarries(a, dig(b, 0)).some((c) => c > 0)) continue;
+                    if (!mulCarries(a, dig(b, 1)).some((c) => c > 0)) continue;
+                    if (level === 3 && a * b < 2000) continue;
+                    if (level === 4 && a * b < 20000) continue;
+                }
+                return { a, b };
+            }
+            throw new Error('genMul failed');
+        }
+
+        // わりざんの すすみかたを さきに ぜんぶ けいさんしておく
+        function divPath(N, D) {
+            const nd = String(N).split('').map(Number);
+            const L = nd.length;
+            let i0 = 0;
+            let cur = nd[0];
+            while (cur < D && i0 < L - 1) { i0++; cur = cur * 10 + nd[i0]; }
+            if (cur < D) return null;
+            const segs = [];
+            let curRow = 1;
+            let rowPtr = 2;
+            for (let i = i0; i < L; i++) {
+                const q = Math.floor(cur / D);
+                const seg = { i, col: L - 1 - i, cur, q, curRow, last: i === L - 1 };
+                if (q > 0) {
+                    seg.prodRow = rowPtr++;
+                    seg.diffRow = rowPtr++;
+                    seg.diff = cur - q * D;
+                    seg.afterRow = seg.diffRow;
+                } else {
+                    seg.diff = cur;
+                    seg.afterRow = curRow;
+                }
+                if (!seg.last) {
+                    seg.next = nd[i + 1];
+                    if (seg.diff === 0 && seg.next === 0) return null; // 「00」に なる もんだいは つかわない
+                    cur = seg.diff * 10 + seg.next;
+                    curRow = seg.afterRow;
+                }
+                segs.push(seg);
+            }
+            return { nd, L, segs, nRows: rowPtr };
+        }
+
+        // わる かずを なんじゅうと みて、しょうの みとおしを たてる
+        function estimateOf(cur, D) {
+            const Dr = Math.round(D / 10) * 10;
+            return { Dr, e: Math.min(9, Math.floor(cur / Dr)) };
+        }
+
+        function genDiv(level, boss) {
+            for (let t = 0; t < 20000; t++) {
+                let N, D;
+                if (level === 1) {
+                    D = rand(2, 9);
+                    const Q = boss ? rand(Math.ceil(100 / D), Math.floor(999 / D)) : rand(10, Math.floor(99 / D));
+                    N = D * Q;
+                    if (String(Q).includes('0')) continue;
+                    if (!boss && Math.floor(N / 10) < D) continue; // しょうが 2けたに なるように
+                } else if (level === 2) {
+                    D = rand(2, 9);
+                    N = (boss || Math.random() < 0.6) ? rand(100, 999) : rand(20, 99);
+                    if (N % D === 0) continue;
+                    if (N < 100 && Math.floor(N / 10) < D) continue;
+                } else {
+                    D = rand(11, 89);
+                    if (D % 10 === 0) continue; // 70 などは みとおしが かんたんすぎる
+                    N = rand(Math.max(D * 2, 40), 999);
+                }
+                const path = divPath(N, D);
+                if (!path) continue;
+                const segs = path.segs;
+                if (level === 2 && boss && !segs.some((s) => s.q === 0)) continue; // ボスは しょうに 0が たつ
+                if (level >= 3) {
+                    if (segs.some((s) => s.q === 0)) continue;
+                    const es = segs.map((s) => estimateOf(s.cur, D).e);
+                    if (level === 3 && !segs.every((s, k) => es[k] === s.q)) continue;
+                    if (level === 4) {
+                        if (!segs.some((s, k) => es[k] !== s.q)) continue;
+                        const ok = segs.every((s, k) => es[k] >= 1 && Math.abs(es[k] - s.q) <= 2 &&
+                            (es[k] <= s.q || len(es[k] * D) <= len(s.cur)));
+                        if (!ok) continue;
+                    }
+                    if (boss && segs.length < 2) continue;
+                    if (!boss && segs.length >= 2 && Math.random() < 0.6) continue;
+                }
+                return { N, D, path };
+            }
+            throw new Error('genDiv failed');
+        }
+
+        // ===== マス目 =====
+        function newGrid(W, nRows) {
+            return { W, rows: Array.from({ length: nRows }, () => ({ cells: {}, small: false, ul: null })) };
+        }
+
+        function setCell(P, r, c, cell) {
+            P.grid.rows[r].cells[c] = cell;
+            if (typeof UI !== 'undefined' && UI.cellChanged) UI.cellChanged(r, c);
+        }
+
+        function clearRow(P, r) {
+            if (r == null) return;
+            const cells = P.grid.rows[r].cells;
+            Object.keys(cells).forEach((c) => {
+                delete cells[c];
+                if (typeof UI !== 'undefined' && UI.cellChanged) UI.cellChanged(r, Number(c));
+            });
+        }
+
+        // ===== かけざん =====
+        function buildMul(P) {
+            const { a, b, level } = P;
+            const A = len(a), B = len(b), total = a * b, T = len(total);
+            const W = Math.max(A + 1, B + 1, T);
+            const g = newGrid(W, B === 1 ? 4 : 6);
+            g.rows[0].small = true; // くりあがりを かく ちいさい だん
+            for (let i = 0; i < A; i++) g.rows[1].cells[i] = { text: String(dig(a, i)), cls: 'given' };
+            for (let i = 0; i < B; i++) g.rows[2].cells[i] = { text: String(dig(b, i)), cls: 'given' };
+            g.rows[2].cells[W - 1] = { text: '×', cls: 'sign' };
+            g.rows[2].ul = [0, W - 1];
+            if (B === 2) g.rows[4].ul = [0, W - 1];
+            P.grid = g;
+
+            const steps = [];
+            for (let j = 0; j < B; j++) {
+                const r = 3 + j;
+                const d = dig(b, j);
+                if (j > 0) {
+                    steps.push({ type: 'action', run: async () => {
+                        clearRow(P, 0);
+                        UI.say(`つぎは 10のくらいの ${d}を かけるよ。いちばん みぎは あけておこう`);
+                        await UI.pause(1400);
+                    } });
+                }
+                let carry = 0;
+                for (let i = 0; i < A; i++) {
+                    const ai = dig(a, i);
+                    const prod = d * ai + carry;
+                    const nc = Math.floor(prod / 10);
+                    const last = i === A - 1;
+                    const ask = carry
+                        ? `${d}×${ai}＝${d * ai}、${d * ai}＋${carry} は？`
+                        : `${d}×${ai} は？`;
+                    const st = { type: 'digit', row: r, col: i + j, answer: prod % 10, ask, label: 'かける', real: true };
+                    if (!last && nc > 0 && level !== 2) {
+                        const col = i + 1;
+                        st.after = () => setCell(P, 0, col, { text: String(nc), cls: 'faint' });
+                    }
+                    steps.push(st);
+                    if (!last && nc > 0 && level === 2) {
+                        steps.push({ type: 'digit', row: 0, col: i + 1, answer: nc, label: 'くりあがり', real: true,
+                            ask: `${prod}の 10のくらいを ちいさく かこう` });
+                    }
+                    if (last && nc > 0) {
+                        steps.push({ type: 'digit', row: r, col: i + j + 1, answer: nc, label: 'かける', real: true,
+                            ask: `${prod}の 10のくらいを かこう` });
+                    }
+                    carry = nc;
+                }
+            }
+
+            if (B === 2) {
+                steps.push({ type: 'action', run: async () => {
+                    clearRow(P, 0);
+                    UI.say('さいごに たてに たしざん！');
+                    await UI.pause(1200);
+                } });
+                const p0 = a * dig(b, 0), p1 = a * dig(b, 1);
+                let c = 0;
+                for (let col = 0; col < T; col++) {
+                    const x = col < len(p0) ? dig(p0, col) : null;
+                    const y = col >= 1 && col - 1 < len(p1) ? dig(p1, col - 1) : null;
+                    const s = (x ?? 0) + (y ?? 0) + c;
+                    const terms = [x, y].filter((v) => v !== null);
+                    let ask;
+                    if (terms.length === 0) ask = 'くりあがりの かずを かこう';
+                    else if (terms.length === 1 && !c) ask = `${terms[0]}を そのまま おろそう`;
+                    else ask = [...terms, ...(c ? [c] : [])].join('＋') + ' は？';
+                    steps.push({ type: 'digit', row: 5, col, answer: s % 10, ask, label: 'たす', real: true });
+                    c = Math.floor(s / 10);
+                }
+            }
+
+            P.queue = steps;
+            P.hpTotal = steps.filter((s) => s.real).length;
+            P.answerText = `${total}`;
+            P.speech = `${a} かける ${b}`;
+            P.chips = level === 1 ? ['かける'] : level === 2 ? ['かける', 'くりあがり'] : ['かける', 'たす'];
+        }
+
+        // ===== わりざん =====
+        function quotAsk(s, D) {
+            if (D < 10) {
+                if (s.cur < D) return `${s.cur}は ${D}より ちいさいね。${s.cur}÷${D} は？`;
+                return `${s.cur}÷${D} は？ ${D}の だんで かんがえよう`;
+            }
+            const { Dr } = estimateOf(s.cur, D);
+            return `${D}を ${Dr}と みて、${s.cur}÷${Dr} は？`;
+        }
+
+        // しょうを v に したときの「かける・ひく・おろす」
+        function segSteps(P, s, v, real) {
+            const D = P.D;
+            const out = [];
+            if (v > 0) {
+                const prod = v * D;
+                for (let k = 0; k < len(prod); k++) {
+                    out.push({ type: 'digit', row: s.prodRow, col: s.col + k, answer: dig(prod, k), label: 'かける', real,
+                        ask: `${D}×${v} は？` });
+                }
+                if (!real && v > s.q) return out; // おおきすぎる しょうは ひけない
+                const diff = s.cur - prod;
+                if (diff > 0 || s.last || !real) {
+                    for (let k = 0; k < len(diff); k++) {
+                        out.push({ type: 'digit', row: s.diffRow, col: s.col + k, answer: dig(diff, k), label: 'ひく', real,
+                            ask: `${s.cur}－${prod} は？` });
+                    }
+                } else {
+                    out.push({ type: 'action', run: async () => {
+                        UI.say(`${s.cur}－${prod}＝0。0は かかないで、つぎを おろそう`);
+                        await UI.pause(1300);
+                    } });
+                }
+            }
+            if (real && !s.last) {
+                out.push({ type: 'digit', row: s.afterRow, col: s.col - 1, answer: s.next, label: 'おろす', real: true,
+                    ask: `つぎの ${s.next}を おろそう` });
+            }
+            return out;
+        }
+
+        // ためしに たてた しょうが あっているか しらべる
+        function trialKind(P, s, v) {
+            if (P.level < 3 || s.q === 0) return null;
+            if (v > s.q && v <= s.q + 2 && len(v * P.D) <= len(s.cur)) return 'big';
+            if (v < s.q && v >= Math.max(1, s.q - 2)) return 'small';
+            return null;
+        }
+
+        function trialSteps(P, s, v) {
+            const out = segSteps(P, s, v, false);
+            out.push({ type: 'action', run: async () => {
+                const big = v > s.q;
+                const nv = big ? v - 1 : v + 1;
+                await UI.trialCheck(P, s, v, big);
+                clearRow(P, s.prodRow);
+                clearRow(P, s.diffRow);
+                if (nv === s.q) {
+                    setCell(P, 0, s.col, { text: String(nv), cls: '', label: 'たてる' });
+                    P.hpLeft--;
+                    if (UI.hpChanged) UI.hpChanged();
+                    P.queue.unshift(...segSteps(P, s, s.q, true));
+                } else {
+                    setCell(P, 0, s.col, { text: String(nv), cls: 'trial' });
+                    P.queue.unshift(...trialSteps(P, s, nv));
+                }
+            } });
+            return out;
+        }
+
+        function buildDiv(P) {
+            const { N, D, path } = P;
+            const { nd, L, segs } = path;
+            const DL = len(D);
+            const g = newGrid(L + 1 + DL, path.nRows);
+            for (let c = 0; c < L; c++) g.rows[1].cells[c] = { text: String(nd[L - 1 - c]), cls: 'given top' };
+            g.rows[1].cells[L] = { text: '', cls: 'bracket' };
+            for (let k = 0; k < DL; k++) g.rows[1].cells[L + 1 + k] = { text: String(dig(D, k)), cls: 'given' };
+            segs.forEach((s) => { if (s.prodRow) g.rows[s.prodRow].ul = [s.col, s.col + len(s.cur) - 1]; });
+            P.grid = g;
+
+            P.queue = segs.map((s) => ({ type: 'quot', row: 0, col: s.col, answer: s.q, seg: s, label: 'たてる', real: true,
+                ask: quotAsk(s, D) }));
+            P.hpTotal = segs.length + segs.reduce((n, s) => n + segSteps(P, s, s.q, true).filter((x) => x.real).length, 0);
+            const Q = Math.floor(N / D), R = N % D;
+            P.answerText = R ? `${Q} あまり ${R}` : `${Q}`;
+            P.speech = `${N} わる ${D}`;
+            P.chips = ['たてる', 'かける', 'ひく', 'おろす'];
+        }
+
+        function makeProblem(op, level, boss) {
+            const P = { op, level, boss };
+            if (op === 'mul') {
+                Object.assign(P, genMul(level, boss));
+                buildMul(P);
+            } else {
+                Object.assign(P, genDiv(level, boss));
+                buildDiv(P);
+            }
+            P.hpLeft = P.hpTotal;
+            P.misses = 0;
+            return P;
+        }
+        // ===== ENGINE END =====
+
+        // ===== ほぞん =====
+        const store = {
+            get(key, fallback) {
+                try {
+                    const v = localStorage.getItem(key);
+                    return v === null ? fallback : JSON.parse(v);
+                } catch (e) { return fallback; }
+            },
+            set(key, value) {
+                try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+            }
+        };
+        const SAVE_KEY = 'hissan_save';
+        const PROGRESS_KEY = 'hissan_progress';
+        const save = Object.assign({ zukan: {}, crowns: {}, xp: 0, best: {} }, store.get(SAVE_KEY, {}));
+        const writeSave = () => store.set(SAVE_KEY, save);
+
+        // ===== iPadで がめんが かくだい されないように =====
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            if (now - lastTouchEnd < 350) e.preventDefault();
+            lastTouchEnd = now;
+        }, { passive: false });
+        document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
+        ['gesturestart', 'gesturechange', 'gestureend'].forEach((type) => {
+            document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
+        });
+        document.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 1) e.preventDefault();
+        }, { passive: false });
+        function resetZoom() {
+            const meta = document.querySelector('meta[name="viewport"]');
+            const base = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+            meta.setAttribute('content', base + ', minimum-scale=1.0');
+            requestAnimationFrame(() => meta.setAttribute('content', base));
+        }
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => {
+                if (window.visualViewport.scale > 1.01) resetZoom();
+            });
+        }
+
+        const $ = (id) => document.getElementById(id);
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)];
+        // ボタンは pointerdown で うける（はやく つづけて おしても とりこぼさない）
+        const onTap = (el, fn) => el.addEventListener('pointerdown', (e) => { e.preventDefault(); fn(e); });
+
+        const state = {
+            sound: store.get('hissan_sound', true),
+            round: null,
+            P: null,
+            busy: false,
+            combo: 0,
+            run: 0,
+            playStart: 0
+        };
+
+        // ===== おと =====
+        let audioCtx = null;
+        function tone(freqs, { type = 'sine', gap = 0.1, dur = 0.3, vol = 0.16 } = {}) {
+            if (!state.sound) return;
+            try {
+                audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+                freqs.forEach((freq, i) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    const t = audioCtx.currentTime + i * gap;
+                    osc.type = type;
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.0001, t);
+                    gain.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+                    osc.connect(gain).connect(audioCtx.destination);
+                    osc.start(t);
+                    osc.stop(t + dur + 0.05);
+                });
+            } catch (e) {}
+        }
+        const sfx = {
+            hit: (combo) => tone([520 + Math.min(combo, 20) * 30], { type: 'triangle', dur: 0.12, vol: 0.14 }),
+            miss: () => tone([240, 190], { type: 'sine', gap: 0.08, dur: 0.18, vol: 0.12 }),
+            finish: () => tone([660, 880, 1100, 1320], { gap: 0.09, dur: 0.4 }),
+            boss: () => tone([220, 207, 196, 185], { type: 'sawtooth', gap: 0.18, dur: 0.3, vol: 0.06 }),
+            guard: () => tone([300, 600], { type: 'square', gap: 0.06, dur: 0.15, vol: 0.06 }),
+            fanfare: () => tone([523, 659, 784, 1047, 784, 1047], { gap: 0.13, dur: 0.35 })
+        };
+
+        function toSpeech(text) {
+            return text
+                .replace(/×/g, ' かける ')
+                .replace(/÷/g, ' わる ')
+                .replace(/－/g, ' ひく ')
+                .replace(/＋/g, ' たす ')
+                .replace(/＝/g, ' は ')
+                .replace(/[？?！!]/g, '')
+                .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '');
+        }
+        function speak(text) {
+            if (!state.sound || !('speechSynthesis' in window)) return;
+            speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(toSpeech(text));
+            u.lang = 'ja-JP';
+            u.rate = 0.9;
+            speechSynthesis.speak(u);
+        }
+
+        function updateSoundButtons() {
+            document.querySelectorAll('.sound-btn').forEach((b) => { b.textContent = state.sound ? '🔊' : '🔇'; });
+        }
+        document.querySelectorAll('.sound-btn').forEach((b) => onTap(b, () => {
+            state.sound = !state.sound;
+            store.set('hissan_sound', state.sound);
+            if (!state.sound && 'speechSynthesis' in window) speechSynthesis.cancel();
+            updateSoundButtons();
+        }));
+        updateSoundButtons();
+
+        // ===== モンスター =====
+        const KEYS = ['mul1', 'mul2', 'mul3', 'mul4', 'div1', 'div2', 'div3', 'div4'];
+        const NAMES = {
+            mul1: ['ポヨリン', 'ちびトゲ', 'まるもち', 'ぷかぷか', 'キング ポヨリン'],
+            mul2: ['くりあげドリ', 'ピョンかに', 'モコだま', 'ぐるぐる', 'だいおう くりあげドリ'],
+            mul3: ['ツノぼう', 'ふたごめ', 'ゆらゆら', 'ギザギザ', 'ツノ ジェネラル'],
+            mul4: ['ゴロいわ', 'やみコウモ', 'みつめ', 'バリバリ', 'まおう ゴロいわ'],
+            div1: ['わけわけ', 'ポテまる', 'チョコン', 'ペタペタ', 'わけわけ キング'],
+            div2: ['あまりん', 'ふわゴースト', 'トゲまる', 'クルリン', 'あまりん だいおう'],
+            div3: ['ほのおトカ', 'ぼうぼう', 'ガルガル', 'ひとつめ', 'ほのお ドラゴ'],
+            div4: ['ナオース', 'ピカピカ', 'ドロン', 'きらぼし', 'だいまおう ナオース']
+        };
+        const HUES = { mul1: 120, mul2: 172, mul3: 212, mul4: 262, div1: 28, div2: 48, div3: 4, div4: 322 };
+        const SHAPES = ['blob', 'round', 'ghost', 'block', 'tall'];
+        const HORNS = ['none', 'two', 'ears', 'one', 'antenna'];
+        const MOUTHS = ['smile', 'fang', 'o', 'zig'];
+        const TOPS = { blob: 30, round: 47, ghost: 30, block: 45, tall: 34 };
+
+        function monsterDef(key, k) {
+            const li = KEYS.indexOf(key);
+            const base = k === 4 ? 0 : k;
+            return {
+                id: `${key}-${k}`, key, k, name: NAMES[key][k], boss: k === 4,
+                shape: SHAPES[(base + li) % 5],
+                horn: HORNS[(base * 2 + li) % 5],
+                mouth: MOUTHS[(base + li * 3) % 4],
+                eyes: [2, 1, 3, 2][(base + li) % 4],
+                wings: k === 4 || (base + li) % 3 === 2,
+                spots: (base + li) % 2 === 0,
+                hue: HUES[key] + [0, 16, -16, 30][base]
+            };
+        }
+        const MONSTERS = KEYS.flatMap((key) => [0, 1, 2, 3, 4].map((k) => monsterDef(key, k)));
+
+        function monsterSVG(m) {
+            const h = m.hue;
+            const body = `hsl(${h} 68% 62%)`, dark = `hsl(${h} 55% 30%)`, light = `hsl(${h} 85% 84%)`;
+            const mirror = (svg) => svg + `<g transform="translate(200 0) scale(-1 1)">${svg}</g>`;
+            const top = TOPS[m.shape];
+            const st = `stroke="${dark}" stroke-width="5" stroke-linejoin="round"`;
+            let s = `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">`;
+            s += `<ellipse cx="100" cy="192" rx="62" ry="8" fill="rgba(0,0,0,0.16)"/>`;
+            if (m.wings) s += mirror(`<path d="M50 105 C12 70 0 112 12 138 C24 124 32 132 46 124 Z" fill="${dark}"/>`);
+            s += `<g transform="translate(0 ${top - 40})">`;
+            if (m.horn === 'two') s += mirror(`<path d="M64 60 L50 12 L88 46 Z" fill="${light}" ${st}/>`);
+            if (m.horn === 'one') s += `<path d="M88 44 L100 0 L112 44 Z" fill="${light}" ${st}/>`;
+            if (m.horn === 'ears') s += mirror(`<path d="M50 72 L54 20 L92 50 Z" fill="${body}" ${st}/>`);
+            if (m.horn === 'antenna') s += mirror(`<path d="M86 46 L68 12" ${st} fill="none"/><circle cx="68" cy="12" r="9" fill="${light}" ${st}/>`);
+            s += `</g>`;
+            s += mirror(`<ellipse cx="34" cy="128" rx="13" ry="21" fill="${body}" ${st} transform="rotate(28 34 128)"/>`);
+            if (m.shape === 'blob') s += `<path d="M100 30 C142 30 176 92 176 132 C176 172 142 186 100 186 C58 186 24 172 24 132 C24 92 58 30 100 30 Z" fill="${body}" ${st}/>`;
+            if (m.shape === 'round') s += mirror(`<ellipse cx="70" cy="180" rx="21" ry="11" fill="${dark}"/>`) + `<circle cx="100" cy="115" r="68" fill="${body}" ${st}/>`;
+            if (m.shape === 'ghost') s += `<path d="M40 182 L40 100 C40 52 70 30 100 30 C130 30 160 52 160 100 L160 182 L140 166 L120 182 L100 166 L80 182 L60 166 Z" fill="${body}" ${st}/>`;
+            if (m.shape === 'block') s += `<rect x="38" y="45" width="124" height="137" rx="34" fill="${body}" ${st}/>`;
+            if (m.shape === 'tall') s += `<ellipse cx="100" cy="110" rx="58" ry="76" fill="${body}" ${st}/>`;
+            s += `<ellipse cx="100" cy="148" rx="36" ry="24" fill="${light}" opacity="0.8"/>`;
+            if (m.spots) s += `<circle cx="62" cy="76" r="7" fill="${light}"/><circle cx="142" cy="84" r="5" fill="${light}"/><circle cx="140" cy="140" r="6" fill="${light}"/>`;
+            const eyes = { 1: [[100, 94, 24]], 2: [[74, 98, 16], [126, 98, 16]], 3: [[68, 102, 12], [100, 86, 13], [132, 102, 12]] }[m.eyes];
+            eyes.forEach(([x, y, r]) => {
+                s += `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" stroke="${dark}" stroke-width="3"/>`;
+                s += `<circle cx="${x + r * 0.15}" cy="${y + r * 0.12}" r="${r * 0.55}" fill="#2b2b2b"/>`;
+                s += `<circle cx="${x - r * 0.08}" cy="${y - r * 0.18}" r="${r * 0.2}" fill="#fff"/>`;
+            });
+            if (m.boss) s += mirror(`<path d="M52 70 L88 80" stroke="${dark}" stroke-width="8" stroke-linecap="round"/>`);
+            if (m.mouth === 'smile' || m.mouth === 'fang') s += `<path d="M78 130 Q100 154 122 130" fill="none" stroke="${dark}" stroke-width="5" stroke-linecap="round"/>`;
+            if (m.mouth === 'fang') s += `<path d="M86 136 L90 147 L95 139 Z" fill="#fff" stroke="${dark}" stroke-width="2"/><path d="M105 139 L110 147 L114 136 Z" fill="#fff" stroke="${dark}" stroke-width="2"/>`;
+            if (m.mouth === 'o') s += `<ellipse cx="100" cy="138" rx="12" ry="14" fill="${dark}"/><ellipse cx="100" cy="146" rx="7" ry="5" fill="#ff8fa3"/>`;
+            if (m.mouth === 'zig') s += `<polyline points="76,134 86,143 96,134 106,143 116,134 124,141" fill="none" stroke="${dark}" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>`;
+            s += mirror(`<ellipse cx="56" cy="124" rx="10" ry="6" fill="#ff8fa3" opacity="0.55"/>`);
+            if (m.boss) {
+                s += `<g transform="translate(0 ${top - 30})"><path d="M66 30 L72 0 L87 18 L100 -4 L113 18 L128 0 L134 30 Z" fill="#ffd23f" stroke="#b8860b" stroke-width="4" stroke-linejoin="round"/>`;
+                s += `<circle cx="100" cy="20" r="5" fill="#e23d3d"/><circle cx="80" cy="23" r="4" fill="#3f8fe0"/><circle cx="120" cy="23" r="4" fill="#3f8fe0"/></g>`;
+            }
+            return s + `</svg>`;
+        }
+
+        // ===== ゆうしゃ =====
+        const TIERS = [
+            { from: 1, cape: '#e05a47', armor: '#8bc34a', move: 'ひっさん スラッシュ', name: 'みならい ゆうしゃ' },
+            { from: 3, cape: '#3d7fe0', armor: '#7cb342', move: 'ブルー スラッシュ', name: 'たてを もった ゆうしゃ' },
+            { from: 6, cape: '#5e6b85', armor: '#b0bec5', move: 'いなずま ぎり', name: 'ぎんの よろいの ゆうしゃ' },
+            { from: 10, cape: '#c62828', armor: '#ffca28', move: 'ゴールド ブレイク', name: 'おうかんの ゆうしゃ' },
+            { from: 15, cape: '#8e24aa', armor: '#ffd54f', move: 'にじいろ フィニッシュ', name: 'でんせつの ゆうしゃ' }
+        ];
+        const heroLevel = (xp) => 1 + Math.floor(Math.sqrt(xp / 20));
+        const xpFor = (lv) => 20 * (lv - 1) * (lv - 1);
+        const tierOf = (lv) => TIERS.filter((t) => lv >= t.from).length - 1;
+
+        function heroSVG(lv) {
+            const ti = tierOf(lv);
+            const t = TIERS[ti];
+            let s = `<svg viewBox="0 0 120 160" xmlns="http://www.w3.org/2000/svg">`;
+            if (ti >= 4) {
+                s += `<defs><radialGradient id="aura"><stop offset="0" stop-color="#fff59d" stop-opacity="0.9"/><stop offset="0.6" stop-color="#ce93d8" stop-opacity="0.5"/><stop offset="1" stop-color="#80deea" stop-opacity="0"/></radialGradient></defs>`;
+                s += `<circle cx="60" cy="88" r="70" fill="url(#aura)"/>`;
+            }
+            s += `<path d="M38 70 L22 140 L98 140 L82 70 Z" fill="${t.cape}"/>`;
+            s += `<rect x="44" y="118" width="12" height="30" rx="5" fill="#5d4037"/><rect x="64" y="118" width="12" height="30" rx="5" fill="#5d4037"/>`;
+            s += `<rect x="38" y="70" width="44" height="54" rx="14" fill="${t.armor}" stroke="#3b3b3b" stroke-width="3"/>`;
+            s += `<rect x="38" y="104" width="44" height="7" fill="#6d4c41"/>`;
+            // つるぎ
+            const glow = ti >= 2 ? `filter="drop-shadow(0 0 4px #fff59d)"` : '';
+            s += `<g transform="rotate(-30 92 96)" ${glow}><rect x="88" y="34" width="9" height="62" rx="3" fill="${ti >= 3 ? '#fff3b0' : '#e0e6ee'}" stroke="#607d8b" stroke-width="2"/><rect x="80" y="94" width="25" height="7" rx="3" fill="#8d6e63"/><rect x="89" y="100" width="7" height="14" rx="3" fill="#5d4037"/></g>`;
+            s += `<circle cx="86" cy="100" r="8" fill="#ffd7b0" stroke="#3b3b3b" stroke-width="2"/>`;
+            if (ti >= 1) s += `<path d="M18 82 L44 78 L44 108 C44 120 30 126 31 126 C30 126 18 118 18 106 Z" fill="${ti >= 3 ? '#ffca28' : '#90a4ae'}" stroke="#3b3b3b" stroke-width="3"/><circle cx="31" cy="100" r="6" fill="${t.cape}"/>`;
+            s += `<circle cx="60" cy="46" r="28" fill="#ffd7b0" stroke="#3b3b3b" stroke-width="3"/>`;
+            if (ti >= 2) s += `<path d="M31 44 C31 14 89 14 89 44 L80 40 C76 26 44 26 40 40 Z" fill="#b0bec5" stroke="#3b3b3b" stroke-width="3"/>`;
+            else s += `<path d="M33 40 C34 16 86 14 88 40 C78 30 66 34 60 26 C54 34 42 30 33 40 Z" fill="#5d4037"/>`;
+            if (ti >= 3) s += `<path d="M42 22 L46 4 L54 16 L60 0 L66 16 L74 4 L78 22 Z" fill="#ffd23f" stroke="#b8860b" stroke-width="3" stroke-linejoin="round"/>`;
+            s += `<circle cx="50" cy="50" r="4" fill="#3b3b3b"/><circle cx="70" cy="50" r="4" fill="#3b3b3b"/>`;
+            s += `<path d="M52 60 Q60 67 68 60" fill="none" stroke="#3b3b3b" stroke-width="3" stroke-linecap="round"/>`;
+            s += `<ellipse cx="43" cy="58" rx="5" ry="3" fill="#ff8fa3" opacity="0.6"/><ellipse cx="77" cy="58" rx="5" ry="3" fill="#ff8fa3" opacity="0.6"/>`;
+            return s + `</svg>`;
+        }
+
+        // ===== がめん きりかえ =====
+        function show(id) {
+            document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id));
+            if (id === 'title') renderTitle();
+            if (id === 'zukan') renderZukan();
+            if (id === 'hero') renderHero();
+        }
+
+        const levelKey = (op, lv) => `${op}${lv}`;
+        const opMark = (op) => (op === 'mul' ? '×' : '÷');
+        const circled = (n) => '①②③④'[n - 1];
+
+        function renderTitle() {
+            $('title-hero').innerHTML = heroSVG(heroLevel(save.xp));
+            const wrap = $('levels');
+            wrap.innerHTML = '';
+            ['mul', 'div'].forEach((op) => {
+                const col = document.createElement('div');
+                col.className = `op-col ${op}`;
+                col.innerHTML = `<div class="op-head">${op === 'mul' ? 'かけざん ×' : 'わりざん ÷'}</div>`;
+                LEVELS[op].forEach((L) => {
+                    const b = document.createElement('button');
+                    b.className = 'level-btn';
+                    const crown = save.crowns[levelKey(op, L.lv)];
+                    b.innerHTML = `<span class="num">${L.lv}</span><span class="txt"><span class="t1">${L.title}</span><span class="t2">${L.sub}</span></span><span class="crown ${crown ? '' : 'off'}">👑</span>`;
+                    b.addEventListener('click', () => startRound(op, L.lv));
+                    col.appendChild(b);
+                });
+                wrap.appendChild(col);
+            });
+            const p = store.get(PROGRESS_KEY, null);
+            const btn = $('resume-btn');
+            if (p && LEVELS[p.op] && p.index > 0) {
+                const L = LEVELS[p.op][p.level - 1];
+                const left = L.normal + 1 - p.index;
+                btn.textContent = `▶ つづきから（${opMark(p.op)}${circled(p.level)}・のこり ${left}たい）`;
+                btn.hidden = false;
+            } else {
+                btn.hidden = true;
+            }
+        }
+        $('resume-btn').addEventListener('click', () => {
+            const p = store.get(PROGRESS_KEY, null);
+            if (p) startRound(p.op, p.level, p);
+        });
+        $('to-zukan').addEventListener('click', () => show('zukan'));
+        $('to-hero').addEventListener('click', () => show('hero'));
+        document.querySelectorAll('.back-btn').forEach((b) => b.addEventListener('click', () => show('title')));
+
+        // ===== ラウンド =====
+        function saveProgress() {
+            const R = state.round;
+            store.set(PROGRESS_KEY, {
+                op: R.op, level: R.level, index: R.index, stars: R.stars, defeated: R.defeated,
+                maxCombo: R.maxCombo, elapsed: R.elapsed, xpGain: R.xpGain
+            });
+        }
+
+        function startRound(op, level, resume) {
+            state.run++;
+            state.round = {
+                op, level,
+                index: resume ? resume.index : 0,
+                stars: resume ? resume.stars : 0,
+                defeated: resume ? resume.defeated : [],
+                maxCombo: resume ? resume.maxCombo : 0,
+                elapsed: resume ? resume.elapsed : 0,
+                xpGain: resume ? resume.xpGain || 0 : 0,
+                lvBefore: heroLevel(save.xp - (resume ? resume.xpGain || 0 : 0))
+            };
+            if (!resume) store.set(PROGRESS_KEY, null);
+            state.combo = 0;
+            show('battle');
+            state.playStart = Date.now();
+            nextProblem();
+        }
+
+        function stopClock() {
+            if (state.round && state.playStart) {
+                state.round.elapsed += Date.now() - state.playStart;
+                state.playStart = 0;
+            }
+        }
+
+        $('home-btn').addEventListener('click', () => {
+            state.run++;
+            state.busy = false;
+            stopClock();
+            if (state.round && state.round.index > 0) saveProgress();
+            if ('speechSynthesis' in window) speechSynthesis.cancel();
+            show('title');
+        });
+
+        function renderDots() {
+            const R = state.round;
+            const L = LEVELS[R.op][R.level - 1];
+            const d = $('dots');
+            d.innerHTML = '';
+            for (let i = 0; i <= L.normal; i++) {
+                const el = document.createElement('div');
+                el.className = 'dot' + (i === L.normal ? ' boss' : '') + (i < R.index ? ' done' : '') + (i === R.index ? ' now' : '');
+                if (i === L.normal) el.textContent = '👑';
+                d.appendChild(el);
+            }
+        }
+
+        function nextProblem() {
+            const R = state.round;
+            const L = LEVELS[R.op][R.level - 1];
+            const boss = R.index === L.normal;
+            const key = levelKey(R.op, R.level);
+            const P = makeProblem(R.op, R.level, boss);
+            P.monster = monsterDef(key, boss ? 4 : Math.floor(Math.random() * 4));
+            state.P = P;
+            state.busy = false;
+
+            renderDots();
+            $('stage').className = 'stage' + (R.op === 'div' ? ' div-stage' : '') + (boss ? ' boss-stage' : '');
+            $('hero-wrap').innerHTML = heroSVG(heroLevel(save.xp));
+            const mon = $('monster');
+            mon.className = (boss ? 'boss ' : '') + 'appear';
+            mon.innerHTML = monsterSVG(P.monster);
+            setTimeout(() => { if (state.P === P) mon.className = (boss ? 'boss ' : '') + 'idle'; }, 650);
+            $('mon-name').textContent = P.monster.name;
+            updateHP();
+            updateCombo();
+            renderChips(null);
+            renderBoard();
+            showPad();
+
+            const first = boss ? `ボスの ${P.monster.name}が あらわれた！` : `${P.monster.name}が あらわれた！`;
+            say(first + ' ' + P.speech.replace(' かける ', ' × ').replace(' わる ', ' ÷ '));
+            if (boss) {
+                sfx.boss();
+                $('battle').classList.add('shake-screen');
+                setTimeout(() => $('battle').classList.remove('shake-screen'), 520);
+            }
+            speak(first + '。' + P.speech);
+            runQueue();
+        }
+
+        // ===== マス目を かく =====
+        let cellEls = [];
+        function renderBoard() {
+            const P = state.P;
+            const g = P.grid;
+            const grid = $('grid');
+            grid.innerHTML = '';
+            cellEls = g.rows.map((row, r) => {
+                const rowEl = document.createElement('div');
+                rowEl.className = 'grow' + (row.small ? ' small' : '');
+                const els = [];
+                for (let c = g.W - 1; c >= 0; c--) {
+                    const el = document.createElement('div');
+                    rowEl.appendChild(el);
+                    els[c] = el;
+                }
+                grid.appendChild(rowEl);
+                return els;
+            });
+            g.rows.forEach((row, r) => { for (let c = 0; c < g.W; c++) paintCell(r, c); });
+            fitBoard();
+        }
+
+        function paintCell(r, c) {
+            const P = state.P;
+            const el = cellEls[r] && cellEls[r][c];
+            if (!el) return;
+            const row = P.grid.rows[r];
+            const cell = row.cells[c];
+            let cls = 'cell';
+            if (row.ul && c >= row.ul[0] && c <= row.ul[1]) cls += ' ul';
+            if (cell && cell.cls) cls += ' ' + cell.cls;
+            el.className = cls;
+            el.textContent = cell ? cell.text : '';
+            if (cell && cell.label) el.dataset.l = cell.label; else delete el.dataset.l;
+            delete el.dataset.hint;
+        }
+
+        function fitBoard() {
+            const P = state.P;
+            if (!P) return;
+            const board = $('board');
+            const effRows = P.grid.rows.reduce((n, r) => n + (r.small ? 0.5 : 1), 0);
+            const w = board.clientWidth - 28, h = board.clientHeight - 28;
+            const size = Math.max(26, Math.min(86, Math.floor(Math.min(w / P.grid.W, h / effRows))));
+            $('grid').style.setProperty('--cell', size + 'px');
+        }
+        window.addEventListener('resize', fitBoard);
+
+        const UI = {
+            cellChanged: (r, c) => paintCell(r, c),
+            say: (t) => say(t),
+            pause: (ms) => wait(ms),
+            hpChanged: () => updateHP(),
+            trialCheck: async (P, s, v, big) => {
+                const run = state.run;
+                const prod = v * P.D;
+                if (big) {
+                    $('monster').className = (P.boss ? 'boss ' : '') + 'guard';
+                    sfx.guard();
+                    const t = `${P.D}×${v}＝${prod}。${s.cur}より おおきいから ひけない！ しょうを 1 へらそう`;
+                    say('🛡️ ' + t);
+                    speak(t);
+                    $('fix-btn').textContent = '⬇ 1 へらす';
+                } else {
+                    const diff = s.cur - prod;
+                    const t = `ひいた こたえの ${diff}は ${P.D}より おおきいね。まだ ひける！ しょうを 1 ふやそう`;
+                    say('💡 ' + t);
+                    speak(t);
+                    $('fix-btn').textContent = '⬆ 1 ふやす';
+                }
+                renderChips('たてる');
+                $('guide').className = 'guide strong';
+                $('guide').innerHTML = `<span class="tag">たてる</span> しょうを なおそう`;
+                await waitButton('fix-btn');
+                if (run !== state.run) throw new Error('stopped');
+                $('monster').className = (P.boss ? 'boss ' : '') + 'idle';
+                showPad();
+            }
+        };
+
+        // ===== バトルの すすめかた =====
+        let currentStep = null;
+
+        async function runQueue() {
+            const P = state.P;
+            const run = state.run;
+            currentStep = null;
+            while (P.queue.length && P.queue[0].type === 'action') {
+                const act = P.queue.shift();
+                state.busy = true;
+                try { await act.run(); } catch (e) { return; }
+                if (run !== state.run || state.P !== P) return;
+                state.busy = false;
+            }
+            if (!P.queue.length) { finishProblem(); return; }
+            currentStep = P.queue.shift();
+            currentStep.misses = 0;
+            highlight();
+        }
+
+        function highlight() {
+            const st = currentStep;
+            document.querySelectorAll('.cell.current').forEach((el) => { el.classList.remove('current'); delete el.dataset.hint; });
+            if (!st) return;
+            const el = cellEls[st.row][st.col];
+            el.classList.add('current');
+            renderChips(st.label);
+            renderGuide();
+        }
+
+        function renderChips(label) {
+            const P = state.P;
+            const chips = $('chips');
+            chips.innerHTML = '';
+            P.chips.forEach((c, i) => {
+                if (i > 0 && P.op === 'div') {
+                    const a = document.createElement('span');
+                    a.className = 'chip arrow';
+                    a.textContent = '→';
+                    chips.appendChild(a);
+                }
+                const el = document.createElement('span');
+                el.className = 'chip' + (c === label ? ' on' : '');
+                el.dataset.label = c;
+                el.textContent = c;
+                chips.appendChild(el);
+            });
+        }
+
+        function renderGuide() {
+            const st = currentStep;
+            const P = state.P;
+            const g = $('guide');
+            g.className = 'guide';
+            if (!st) { g.textContent = ''; return; }
+            const always = P.level <= 2; // ①②は いつも ヒントを だしておく
+            if (st.misses >= 3) {
+                g.className = 'guide strong';
+                g.innerHTML = `<span class="tag">ヒント</span> ${st.ask}　こたえは ${st.answer}`;
+            } else if (st.misses >= 2 || always) {
+                if (st.misses >= 2) g.className = 'guide strong';
+                g.innerHTML = `<span class="tag">${st.label}</span> ${st.ask}`;
+            } else {
+                g.innerHTML = `<span class="tag">${st.label}</span> ひかっている マスに かずを いれよう`;
+            }
+        }
+
+        function say(text) { $('bubble').textContent = text; }
+
+        function updateHP() {
+            const P = state.P;
+            $('hp-bar').style.width = (100 * Math.max(0, P.hpLeft) / P.hpTotal) + '%';
+        }
+
+        function updateCombo(pop) {
+            const el = $('combo');
+            if (state.combo >= 3) {
+                el.hidden = false;
+                el.textContent = `🔥 ${state.combo} コンボ`;
+                if (pop) { el.classList.add('pop'); setTimeout(() => el.classList.remove('pop'), 150); }
+            } else {
+                el.hidden = true;
+            }
+        }
+
+        const PRAISE = ['いいね！', 'その ちょうし！', 'ナイス！', 'すごい！', 'ばっちり！'];
+        const OSHII = ['おしい！ もういちど', 'ひらり！ よけられた', 'もう いっかい！'];
+
+        function onDigit(v) {
+            const P = state.P;
+            const st = currentStep;
+            if (state.busy || !P || !st) return;
+
+            if (st.type === 'quot' && v !== st.answer) {
+                const kind = trialKind(P, st.seg, v);
+                if (kind) {
+                    setCell(P, 0, st.col, { text: String(v), cls: 'trial' });
+                    const t = `${v}で ためして みよう！ ${P.D}×${v}を けいさんしよう`;
+                    say('✏️ ' + t);
+                    P.queue.unshift(...trialSteps(P, st.seg, v));
+                    runQueue();
+                    return;
+                }
+            }
+
+            if (v === st.answer) {
+                setCell(P, st.row, st.col, { text: String(v), cls: 'pop', label: st.label });
+                state.combo++;
+                state.round.maxCombo = Math.max(state.round.maxCombo, state.combo);
+                updateCombo(true);
+                if (st.real) { P.hpLeft--; updateHP(); }
+                attackEffect(cellEls[st.row][st.col]);
+                sfx.hit(state.combo);
+                if (st.after) st.after();
+                if (st.type === 'quot') P.queue.unshift(...segSteps(P, st.seg, st.answer, true));
+                if (state.combo % 5 === 0) say(`${state.combo} コンボ！ ${pickOne(PRAISE)}`);
+                else if (st.label === 'おろす') say('おろしたら、また たてる！');
+                runQueue();
+            } else {
+                miss(st);
+            }
+        }
+
+        function miss(st) {
+            const P = state.P;
+            P.misses++;
+            st.misses++;
+            state.combo = 0;
+            updateCombo();
+            sfx.miss();
+            const el = cellEls[st.row][st.col];
+            el.classList.remove('shake');
+            void el.offsetWidth;
+            el.classList.add('shake');
+            const mon = $('monster');
+            mon.className = (P.boss ? 'boss ' : '') + 'dodge';
+            setTimeout(() => { if (state.P === P && mon.classList.contains('dodge')) mon.className = (P.boss ? 'boss ' : '') + 'idle'; }, 520);
+            if (st.misses >= 3) {
+                el.dataset.hint = String(st.answer);
+                say(`こたえは ${st.answer}。うすい かずを みて いれてみよう`);
+                speak(`${st.ask}。こたえは ${st.answer}`);
+            } else if (st.misses === 2) {
+                say(`ヒント： ${st.ask}`);
+                speak(st.ask);
+            } else {
+                say(pickOne(OSHII));
+            }
+            renderGuide();
+        }
+
+        function attackEffect(fromEl) {
+            const hero = $('hero-wrap');
+            hero.classList.remove('attack');
+            void hero.offsetWidth;
+            hero.classList.add('attack');
+            const mon = $('monster');
+            const P = state.P;
+            mon.className = (P.boss ? 'boss ' : '') + 'hit';
+            setTimeout(() => { if (state.P === P && mon.classList.contains('hit')) mon.className = (P.boss ? 'boss ' : '') + 'idle'; }, 300);
+
+            const a = fromEl.getBoundingClientRect();
+            const b = mon.getBoundingClientRect();
+            const p = document.createElement('div');
+            p.className = 'particle';
+            p.textContent = state.combo >= 10 ? '🌟' : '⭐';
+            document.body.appendChild(p);
+            const x0 = a.left + a.width / 2 - 17, y0 = a.top + a.height / 2 - 17;
+            const x1 = b.left + b.width / 2 - 17, y1 = b.top + b.height / 2 - 17;
+            const anim = p.animate([
+                { transform: `translate(${x0}px, ${y0}px) scale(0.6)` },
+                { transform: `translate(${(x0 + x1) / 2}px, ${Math.min(y0, y1) - 60}px) scale(1.3)` },
+                { transform: `translate(${x1}px, ${y1}px) scale(1)` }
+            ], { duration: 380, easing: 'ease-in' });
+            anim.onfinish = () => {
+                p.remove();
+                const wrap = $('mon-wrap');
+                const d = document.createElement('div');
+                d.className = 'dmg';
+                d.textContent = state.combo >= 3 ? `${state.combo}!` : '+1';
+                d.style.left = (40 + Math.random() * 20) + '%';
+                d.style.top = (30 + Math.random() * 20) + '%';
+                wrap.appendChild(d);
+                setTimeout(() => d.remove(), 800);
+            };
+        }
+
+        // ===== パッド =====
+        (function buildPad() {
+            const pad = $('pad');
+            [1, 2, 3, 4, 5, 6, 7, 8, 9, 0].forEach((n) => {
+                const b = document.createElement('button');
+                b.textContent = n;
+                onTap(b, () => {
+                    b.classList.add('down');
+                    setTimeout(() => b.classList.remove('down'), 120);
+                    onDigit(n);
+                });
+                pad.appendChild(b);
+            });
+        })();
+        document.addEventListener('keydown', (e) => {
+            if (!$('battle').classList.contains('active')) return;
+            if (/^[0-9]$/.test(e.key) && !$('pad').hidden) onDigit(Number(e.key));
+            if (e.key === 'Enter' && !$('action-area').hidden) {
+                const btn = [$('fix-btn'), $('next-btn')].find((b) => !b.hidden);
+                if (btn) btn.dispatchEvent(new Event('pointerdown'));
+            }
+        });
+
+        function showPad() {
+            $('pad').hidden = false;
+            $('action-area').hidden = true;
+        }
+
+        let buttonWaiter = null;
+        function waitButton(id) {
+            $('pad').hidden = true;
+            $('action-area').hidden = false;
+            $('fix-btn').hidden = id !== 'fix-btn';
+            $('next-btn').hidden = id !== 'next-btn';
+            return new Promise((resolve) => { buttonWaiter = resolve; });
+        }
+        ['fix-btn', 'next-btn'].forEach((id) => onTap($(id), () => {
+            if (buttonWaiter) { const r = buttonWaiter; buttonWaiter = null; r(); }
+        }));
+
+        // ===== たおした！ =====
+        async function finishProblem() {
+            const P = state.P;
+            const R = state.round;
+            const run = state.run;
+            state.busy = true;
+            currentStep = null;
+            highlight();
+            renderChips(null);
+            $('guide').className = 'guide strong';
+            $('guide').innerHTML = `<span class="tag">こたえ</span> ${P.answerText}`;
+
+            const tier = TIERS[tierOf(heroLevel(save.xp))];
+            const flash = document.createElement('div');
+            flash.className = 'flash';
+            flash.innerHTML = `<span>${tier.move}！</span>`;
+            document.body.appendChild(flash);
+            sfx.finish();
+            speak(tier.move);
+            await wait(450);
+            $('monster').className = (P.boss ? 'boss ' : '') + 'defeat';
+            await wait(800);
+            flash.remove();
+            if (run !== state.run) return;
+
+            const stars = P.misses === 0 ? 3 : P.misses <= 2 ? 2 : 1;
+            R.stars += stars;
+            const isNew = !save.zukan[P.monster.id];
+            save.zukan[P.monster.id] = (save.zukan[P.monster.id] || 0) + 1;
+            const gain = P.hpTotal + (P.boss ? 20 : 5);
+            const lvOld = heroLevel(save.xp);
+            save.xp += gain;
+            R.xpGain += gain;
+            R.defeated.push(P.monster.id);
+            writeSave();
+            R.index++;
+            if (R.index <= LEVELS[R.op][R.level - 1].normal) saveProgress();
+
+            let msg = `${P.monster.name}を やっつけた！ ${'⭐'.repeat(stars)}`;
+            if (P.misses === 0) msg += ' ノーミス！';
+            if (isNew) msg += ' 📖 ずかんに とうろく！';
+            if (heroLevel(save.xp) > lvOld) msg += ` ゆうしゃが レベル ${heroLevel(save.xp)}に なった！`;
+            say(msg);
+            speak(msg);
+            renderDots();
+            $('next-btn').textContent = P.boss ? 'けっかを みる ▶' : 'つぎへ ▶';
+            await waitButton('next-btn');
+            if (run !== state.run) return;
+            showPad();
+            if (P.boss) finishRound();
+            else nextProblem();
+        }
+
+        function finishRound() {
+            const R = state.round;
+            stopClock();
+            store.set(PROGRESS_KEY, null);
+            const key = levelKey(R.op, R.level);
+            const notes = [];
+            if (!save.crowns[key]) notes.push(`👑 ${opMark(R.op)}${circled(R.level)}の おうかんを ゲット！`);
+            save.crowns[key] = true;
+            const best = save.best[key] || {};
+            const sec = Math.round(R.elapsed / 1000);
+            if (!best.combo || R.maxCombo > best.combo) {
+                if (best.combo) notes.push(`🔥 じこベスト こうしん！ れんぞく ${R.maxCombo} コンボ`);
+                best.combo = R.maxCombo;
+            }
+            if (!best.time || sec < best.time) {
+                if (best.time) notes.push(`⏱️ じこベスト こうしん！ ${fmtTime(sec)}`);
+                best.time = sec;
+            }
+            save.best[key] = best;
+            writeSave();
+            const lv = heroLevel(save.xp);
+            if (lv > R.lvBefore) notes.push(`🛡️ ゆうしゃ レベル ${R.lvBefore} → ${lv}`);
+            if (tierOf(lv) > tierOf(R.lvBefore)) notes.push(`✨ あたらしい ひっさつわざ「${TIERS[tierOf(lv)].move}」`);
+            notes.push(`れんぞく ${R.maxCombo} コンボ ／ ${fmtTime(sec)}`);
+
+            $('result-title').textContent = `${opMark(R.op)}${circled(R.level)} クリア！`;
+            $('result-stars').textContent = `⭐ × ${R.stars}`;
+            $('result-mons').innerHTML = R.defeated.map((id) => {
+                const [key2, k] = id.split('-');
+                return monsterSVG(monsterDef(key2, Number(k)));
+            }).join('');
+            $('result-notes').innerHTML = notes.map((n) => `<div>${n}</div>`).join('');
+            show('result');
+            sfx.fanfare();
+            speak(`クリア！ ほしを ${R.stars}こ あつめたよ`);
+        }
+
+        function fmtTime(sec) {
+            const m = Math.floor(sec / 60), s = sec % 60;
+            return m ? `${m}ふん ${s}びょう` : `${s}びょう`;
+        }
+
+        $('again-btn').addEventListener('click', () => startRound(state.round.op, state.round.level));
+        $('to-title').addEventListener('click', () => show('title'));
+
+        // ===== ずかん・ゆうしゃ =====
+        function renderZukan() {
+            const got = MONSTERS.filter((m) => save.zukan[m.id]).length;
+            $('zukan-title').textContent = `ずかん　${got} / ${MONSTERS.length}`;
+            const grid = $('zukan-grid');
+            grid.innerHTML = '';
+            KEYS.forEach((key) => {
+                const op = key.slice(0, 3), lv = Number(key[3]);
+                const sec = document.createElement('div');
+                sec.className = 'zsection';
+                sec.textContent = `${op === 'mul' ? 'かけざん' : 'わりざん'} ${circled(lv)}　${LEVELS[op][lv - 1].title}`;
+                grid.appendChild(sec);
+                MONSTERS.filter((m) => m.key === key).forEach((m) => {
+                    const n = save.zukan[m.id] || 0;
+                    const card = document.createElement('div');
+                    card.className = 'zcard' + (n ? '' : ' unknown') + (m.boss ? ' boss' : '');
+                    card.innerHTML = monsterSVG(m) +
+                        `<div class="zname">${n ? m.name : '？？？'}</div>` +
+                        `<div class="zsub">${n ? `やっつけた かず ${n}` : (m.boss ? 'ボス' : 'まだ あっていない')}</div>`;
+                    grid.appendChild(card);
+                });
+            });
+        }
+
+        function renderHero() {
+            const lv = heroLevel(save.xp);
+            const ti = tierOf(lv);
+            $('hero-big').innerHTML = heroSVG(lv);
+            const cur = xpFor(lv), nxt = xpFor(lv + 1);
+            const pct = Math.round(100 * (save.xp - cur) / (nxt - cur));
+            const nextTier = TIERS[ti + 1];
+            const recs = [];
+            KEYS.forEach((key) => {
+                const b = save.best[key];
+                if (b) recs.push(`${opMark(key.slice(0, 3))}${circled(Number(key[3]))}　🔥${b.combo} コンボ　⏱️${fmtTime(b.time)}`);
+            });
+            $('hero-info').innerHTML = `
+                <div class="lv">レベル ${lv}</div>
+                <div>${TIERS[ti].name}</div>
+                <div class="xpbar"><div style="width:${pct}%"></div></div>
+                <div>つぎの レベルまで あと ${nxt - save.xp}</div>
+                <div>ひっさつわざ：<b>${TIERS[ti].move}</b></div>
+                ${nextTier ? `<div>レベル ${nextTier.from}で「${nextTier.move}」を おぼえる！</div>` : '<div>さいこうの ゆうしゃ！</div>'}
+                <div class="records">${recs.length ? 'じこベスト<br>' + recs.join('<br>') : 'ボスを たおすと じこベストが のこるよ'}</div>`;
+        }
+
+        show('title');
+    </script>
+</body>
+</html>
