@@ -110,7 +110,7 @@ def parse_line(line):
     return k, items
 
 
-def check_sentence(k, grade, s, grade_of, ok_readings, errors, warns):
+def check_sentence(k, grade, s, grade_of, ok_readings, kun, errors, warns):
     t, y = s['t'], s['y']
     m = re.fullmatch(r'([^\[\]]*)\[([^\[\]]+)\]([^\[\]]*)', t)
     if not m:
@@ -159,6 +159,12 @@ def check_sentence(k, grade, s, grade_of, ok_readings, errors, warns):
     if ky not in y:
         errors.append(f'{k}: 字のよみ「{ky}」が よみ「{y}」に ふくまれない: {s["raw"]}')
         return None
+    post = m.group(3)
+    if word == k and post:
+        for r in kun:
+            if r.startswith(ky) and r != ky and post.startswith(r[len(ky):]):
+                errors.append(f'{k}: 送りがな「{r[len(ky):]}」を [ ] の中に入れる: {s["raw"]}')
+                return None
     if ky not in ok_readings and (ky + tail) not in ok_readings:
         warns.append(f'{k}: 字のよみ「{ky}」が常用漢字表の音訓にない（特別な読み？）: {s["raw"]}')
         return {'t': t, 'y': y, 'ky': ky, 'sp': 1}  # sp: 特別な読み。書きの問題には出さない
@@ -204,7 +210,7 @@ def main():
                 errors.append(f'{k}: 筆順データがない')
             items = []
             for s in sents.get(k, []):
-                r = check_sentence(k, g, s, grade_of, ok, errors, warns)
+                r = check_sentence(k, g, s, grade_of, ok, kun, errors, warns)
                 if r:
                     items.append(r)
             if len(items) < 2:
@@ -219,6 +225,12 @@ def main():
                 f.write('\n]}\n')
         n_sent = sum(len(e['sentences']) for e in out)
         print(f'{g}年: {len(out)}字, 例文 {n_sent}本')
+
+    if not args.check:
+        have = sorted(int(f[1:-5]) for f in os.listdir(OUT) if re.fullmatch(r'g\d\.json', f))
+        with open(os.path.join(OUT, 'index.json'), 'w', encoding='utf-8') as f:
+            json.dump({'grades': have}, f)
+            f.write('\n')
 
     for w in warns:
         print('注意:', w)
