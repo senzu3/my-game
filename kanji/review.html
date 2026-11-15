@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>例文チェック</title>
+<style>
+  :root { --bg:#fffaf0; --ink:#2b2b2b; --sub:#777; --line:#e6dccb; --mark:#ffe08a; --warn:#d9534f; --accent:#2f80ed; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif; }
+  header { position:sticky; top:0; background:var(--bg); border-bottom:1px solid var(--line); padding:12px 16px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; z-index:1; }
+  h1 { font-size:18px; margin:0 12px 0 0; }
+  button, select { font:inherit; padding:6px 12px; border-radius:8px; border:1px solid var(--line); background:#fff; }
+  button.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+  main { padding:8px 16px 80px; max-width:900px; margin:0 auto; }
+  .k { display:grid; grid-template-columns:56px 1fr; gap:8px; padding:10px 0; border-bottom:1px solid var(--line); }
+  .k .big { font-size:40px; line-height:1; text-align:center; }
+  .k .yomi { font-size:12px; color:var(--sub); margin-bottom:4px; }
+  .s { display:flex; align-items:center; gap:8px; padding:3px 0; }
+  .s input { width:20px; height:20px; flex:none; }
+  .s .t { flex:1; }
+  .s .t b { background:var(--mark); font-weight:normal; padding:0 2px; }
+  .s .y { color:var(--sub); font-size:13px; }
+  .sp { color:var(--warn); font-size:12px; }
+  .flagged { background:#fff0f0; }
+  #note { font-size:13px; color:var(--sub); }
+</style>
+</head>
+<body>
+<header>
+  <h1>例文チェック</h1>
+  <select id="grade"><option value="1">1年</option><option value="2">2年</option><option value="3" selected>3年</option><option value="4">4年</option></select>
+  <button id="only">気になる文だけ</button>
+  <button id="copy">気になる文をコピー</button>
+  <span id="note"></span>
+</header>
+<main id="list"></main>
+<script>
+// 親が例文を確かめるページ。おかしな文に印をつけて「コピー」し、Claude にわたすと直してもらえる。
+const KEY = 'kanjiReview.flags';
+let flags = {};
+try { flags = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(flags)); } catch (e) {} };
+let data = [], onlyFlagged = false;
+
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+const mark = t => esc(t).replace(/\[([^\]]+)\]/, '<b>$1</b>');
+const idOf = (k, s) => k + '|' + s.t;
+
+function render() {
+  const list = document.getElementById('list');
+  list.innerHTML = '';
+  let shown = 0;
+  for (const e of data) {
+    const sents = e.sentences.filter(s => !onlyFlagged || flags[idOf(e.k, s)]);
+    if (onlyFlagged && !sents.length) continue;
+    const row = document.createElement('div');
+    row.className = 'k';
+    row.innerHTML = `<div class="big">${e.k}</div><div><div class="yomi">音：${e.on.join('・') || '—'}　訓：${e.kun.join('・') || '—'}</div></div>`;
+    const box = row.lastElementChild;
+    for (const s of sents) {
+      const id = idOf(e.k, s);
+      const line = document.createElement('label');
+      line.className = 's' + (flags[id] ? ' flagged' : '');
+      line.innerHTML = `<input type="checkbox" ${flags[id] ? 'checked' : ''}><span class="t">${mark(s.t)}　<span class="y">${esc(s.y)}（${esc(e.k)}＝${esc(s.ky)}）</span>${s.sp ? ' <span class="sp">特別な読み</span>' : ''}</span>`;
+      line.querySelector('input').addEventListener('change', ev => {
+        if (ev.target.checked) flags[id] = true; else delete flags[id];
+        line.classList.toggle('flagged', ev.target.checked);
+        save(); updateNote();
+      });
+      box.appendChild(line);
+      shown++;
+    }
+    list.appendChild(row);
+  }
+  if (!shown) list.textContent = onlyFlagged ? '気になる文はありません。' : '例文がありません。';
+  updateNote();
+}
+
+function updateNote() {
+  const n = data.reduce((a, e) => a + e.sentences.length, 0);
+  const f = Object.keys(flags).length;
+  document.getElementById('note').textContent = `${data.length}字・${n}本　気になる：ぜんぶで ${f}本`;
+}
+
+async function load() {
+  const g = document.getElementById('grade').value;
+  const res = await fetch(`data/g${g}.json`);
+  data = (await res.json()).kanji;
+  render();
+}
+
+document.getElementById('grade').addEventListener('change', load);
+document.getElementById('only').addEventListener('click', ev => {
+  onlyFlagged = !onlyFlagged;
+  ev.target.classList.toggle('on', onlyFlagged);
+  render();
+});
+document.getElementById('copy').addEventListener('click', async () => {
+  const text = Object.keys(flags).map(id => id.replace('|', '：')).join('\n') || '（なし）';
+  try { await navigator.clipboard.writeText(text); alert('コピーしました'); }
+  catch (e) { prompt('コピーしてください', text); }
+});
+load();
+</script>
+</body>
+</html>
