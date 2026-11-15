@@ -2,7 +2,7 @@
 # かんじの へや: 学年ごとの漢字データ kanji/data/gN.json を作る
 #
 # つかいかた:
-#   python3 -I tools/build_kanji_data.py            # 1〜4年をつくる（KanjiVG はなければダウンロード）
+#   python3 -I tools/build_kanji_data.py            # 1〜6年をつくる（KanjiVG はなければダウンロード）
 #   python3 -I tools/build_kanji_data.py --check    # つくらずに 例文と筆順を しらべるだけ
 #   python3 -I tools/build_kanji_data.py --grades 1,2,3,4,5,6
 #
@@ -174,7 +174,7 @@ def check_sentence(k, grade, s, grade_of, ok_readings, kun, errors, warns):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--check', action='store_true')
-    ap.add_argument('--grades', default='1,2,3,4')
+    ap.add_argument('--grades', default='1,2,3,4,5,6')
     ap.add_argument('--no-fetch', action='store_true')
     args = ap.parse_args()
     grades = [int(x) for x in args.grades.split(',')]
