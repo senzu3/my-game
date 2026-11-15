@@ -33,7 +33,6 @@
   .big-btn .small { display: block; font-size: 14px; font-weight: normal; color: var(--sub); margin-top: 2px; }
   .big-btn.main { background: var(--focus); box-shadow: 0 4px 0 #d9ad22; font-size: 26px; padding: 24px 20px; }
   .big-btn.done { background: #e4f4e7; box-shadow: 0 4px 0 #b6dcbd; }
-  .big-btn.reward { background: #ffe1ec; box-shadow: 0 4px 0 #f1b3c8; }
   h1.logo { text-align: center; font-size: 34px; margin: 18px 0 4px; letter-spacing: 2px; }
   .logo-sub { text-align: center; color: var(--sub); margin-bottom: 12px; }
   .medals { text-align: center; font-size: 28px; min-height: 34px; }
@@ -134,7 +133,6 @@
   <div class="logo-sub" id="home-grade"></div>
   <div class="medals" id="medals"></div>
   <button class="big-btn main" id="btn-daily"><span class="emoji">📝</span><span>きょうの 10もん<span class="small" id="daily-sub"></span></span></button>
-  <button class="big-btn reward" id="btn-shoot" style="display:none"><span class="emoji">🚀</span><span>ごほうび：かんじシューティング<span class="small">おぼえた かんじで あそぼう</span></span></button>
   <button class="big-btn" id="btn-free"><span class="emoji">✏️</span><span>じゆう れんしゅう<span class="small">がくねんと よみ・かきを えらぶ</span></span></button>
   <button class="big-btn" id="btn-zukan"><span class="emoji">📖</span><span>かんじ ずかん<span class="small" id="zukan-sub"></span></span></button>
   <div class="credit">
@@ -174,7 +172,6 @@
     <div class="result-list" id="result-list"></div>
     <div class="newly" id="result-new"></div>
   </div>
-  <button class="big-btn reward" id="result-shoot" style="display:none"><span class="emoji">🚀</span><span>ごほうび：かんじシューティング</span></button>
   <button class="big-btn" id="result-home"><span class="emoji">🏠</span><span>ホームへ</span></button>
 </section>
 
@@ -217,7 +214,7 @@
 'use strict';
 // ===== かんじの へや =====
 // データ: kanji/data/gN.json（tools/build_kanji_data.py でつくる）
-// きろく: localStorage 'kanjiHub.v1'（index.html のシューティングも よむ）
+// きろく: localStorage 'kanjiHub.v1'
 
 const STORE_KEY = 'kanjiHub.v1';
 const MAX_GRADE = 6;
@@ -336,7 +333,6 @@ function goHome() {
   $('daily-sub').textContent = doneToday ? 'きょうは おわり！ あしたも がんばろう'
     : state.daily && state.daily.day === TODAY ? `つづきから（${state.daily.pos} / ${state.daily.items.length}）`
     : due ? `ふくしゅう ${Math.min(due, DAILY_SIZE)}もん ＋ あたらしい かんじ` : 'あたらしい かんじに ちょうせん';
-  $('btn-shoot').style.display = doneToday ? '' : 'none';
   const total = grades.reduce((a, g) => a + BY_GRADE[g].length, 0);
   const mastered = grades.reduce((a, g) => a + BY_GRADE[g].filter(e => isMastered(e.k)).length, 0);
   $('zukan-sub').textContent = `おぼえた かんじ ${mastered} / ${total}`;
@@ -346,10 +342,7 @@ function goHome() {
 $('btn-zukan').addEventListener('click', () => openZukan(Math.min(state.grade, availableGrades().slice(-1)[0] || 1)));
 $('btn-free').addEventListener('click', openFree);
 $('to-settings').addEventListener('click', openSettings);
-$('btn-shoot').addEventListener('click', goShoot);
-$('result-shoot').addEventListener('click', goShoot);
 $('result-home').addEventListener('click', goHome);
-function goShoot() { location.href = 'index.html?hub=1'; }
 
 function checkMedals() {
   for (const g of availableGrades()) {
@@ -577,7 +570,6 @@ function showResult() {
   if (quiz.kind === 'daily') {
     state.lastDailyDone = TODAY; state.daily = null; save();
   }
-  $('result-shoot').style.display = quiz.kind === 'daily' ? '' : 'none';
   checkMedals();
   show('result');
   speak(okN === rs.length ? 'ぜんもん せいかい！ すごい！' : 'おつかれさま！');

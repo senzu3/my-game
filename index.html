@@ -228,71 +228,6 @@ const KANJI_DATA = [
 
 /**
  * ========================================================
- * 「かんじの へや」（kanji.html）からの ごほうびモード
- * index.html?hub=1 で開くと、へやで おぼえた かんじから 出題する。
- * まちがえた かんじは、へやの つぎの「きょうの10もん」で いちばん さきに 出るようにする。
- * （ずかんの「おぼえた」には かかわらない）
- * ========================================================
- */
-const HUB_KEY = 'kanjiHub.v1';
-const hubParams = new URLSearchParams(location.search);
-const HUB_MODE = hubParams.get('hub') === '1';
-function hubToday() {
-    const s = hubParams.get('today') || (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
-    return Math.round(Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / 86400000);
-}
-function hubLoadState() { try { return JSON.parse(localStorage.getItem(HUB_KEY) || 'null'); } catch (e) { return null; } }
-async function loadHubProblems() {
-    const st = hubLoadState();
-    if (!st || !st.cards) return 0;
-    // よみを いちどは せいかいした かんじ（おぼえた ものを さきに）
-    const learned = Object.entries(st.cards)
-        .filter(([id, c]) => id.endsWith('|r') && c.box >= 1)
-        .sort((a, b) => b[1].box - a[1].box)
-        .map(([id]) => id.split('|')[0]);
-    if (!learned.length) return 0;
-    let grades = [];
-    try { grades = (await (await fetch('kanji/data/index.json')).json()).grades; } catch (e) { return 0; }
-    const data = {};
-    await Promise.all(grades.map(g => fetch(`kanji/data/g${g}.json`).then(r => r.json()).then(d => d.kanji.forEach(e => { data[e.k] = e; })).catch(() => {})));
-    const probs = [];
-    for (const k of learned.slice(0, 40)) {
-        const e = data[k];
-        if (!e) continue;
-        // 「[水]」のように 1字だけの ことばを えらぶ。なければ 2字の じゅくご
-        const words = e.sentences.map(s => ({ s, w: (s.t.match(/\[([^\]]+)\]/) || [])[1] || '' }))
-            .filter(x => !/[ぁ-ゟ]/.test(x.w) && !x.s.sp);
-        const best = words.find(x => x.w === k) || words.find(x => x.w.length <= 2);
-        if (best) probs.push({ kanji: best.w, correct: best.s.y, k, alt: [...e.on, ...e.sentences.map(s => s.y)] });
-    }
-    if (probs.length < 5) return 0;
-    for (const p of probs) {
-        const cands = new Set();
-        p.alt.forEach(a => cands.add(a));
-        probs.forEach(q => { if (Math.abs(q.correct.length - p.correct.length) <= 1) cands.add(q.correct); });
-        cands.delete(p.correct);
-        const list = shuffleArray([...cands]).slice(0, 3);
-        while (list.length < 3) list.push(probs[Math.floor(Math.random() * probs.length)].correct + 'ん');
-        p.dummies = list;
-        delete p.alt;
-    }
-    KANJI_DATA.splice(0, KANJI_DATA.length, ...probs);
-    return probs.length;
-}
-const hubMissed = new Set();
-function hubReportMiss(problem) {
-    if (!HUB_MODE || !problem || !problem.k || hubMissed.has(problem.k)) return;
-    hubMissed.add(problem.k);
-    const st = hubLoadState();
-    if (!st || !st.cards) return;
-    const c = st.cards[problem.k + '|r'];
-    if (!c) return;
-    c.due = Math.min(c.due, hubToday());   // きょうの10もんで もういちど
-    try { localStorage.setItem(HUB_KEY, JSON.stringify(st)); } catch (e) {}
-}
-
-/**
- * ========================================================
  * ゲームのメインロジック
  * ========================================================
  */
@@ -594,7 +529,6 @@ function update() {
                     scoreElement.innerText = score;
                     createParticles(e.x, e.y, "#ff4c4c");
                     createTextEffect(e.x, e.y, "❌", "#ff4c4c");
-                    hubReportMiss(currentProblem);
                     enemies.splice(j, 1); // 撃った不正解だけ消す
                 }
                 break; // 1つの弾は1つの敵にだけ当たる
@@ -624,7 +558,6 @@ function update() {
                 scoreElement.innerText = score;
                 createParticles(e.x, e.y, "#ff4c4c");
                 createTextEffect(e.x, e.y, "❌", "#ff4c4c");
-                hubReportMiss(currentProblem);
                 enemies.splice(j, 1); // ぶつかった不正解だけ消す
             }
             break; // 1度にぶつかるのは1つまで
@@ -814,24 +747,6 @@ startEndlessBtn.addEventListener('click', () => startGame('endless'));
 startTimeAttackBtn.addEventListener('click', () => startGame('timeAttack'));
 retryBtn.addEventListener('click', () => startGame(gameMode));
 homeBtn.addEventListener('click', goHome);
-
-// 「かんじの へや」から きたとき
-if (HUB_MODE) {
-    const back = document.createElement('a');
-    back.href = 'kanji.html';
-    back.className = 'btn';
-    back.id = 'hub-back-btn';
-    back.textContent = '← かんじの へやに もどる';
-    back.style.textDecoration = 'none';
-    back.style.textAlign = 'center';
-    startButtons.appendChild(back);
-    resultButtons.appendChild(back.cloneNode(true));
-    loadHubProblems().then(n => {
-        mainDesc.innerHTML = n
-            ? `へやで おぼえた かんじ ${n}こ が でるよ！<br>` + mainDesc.innerHTML
-            : 'まだ おぼえた かんじが すくないので、いつもの もんだいで あそぼう<br>' + mainDesc.innerHTML;
-    });
-}
 
 // 初期描画だけ開始しておく（背景の星を動かすため）
 gameLoop();
