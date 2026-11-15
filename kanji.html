@@ -69,6 +69,7 @@
   .pad-wrap { position: relative; width: min(100%, 52vh, 420px); aspect-ratio: 1; margin: 0 auto; }
   .pad { width: 100%; height: 100%; background: var(--card); border-radius: 18px; box-shadow: 0 3px 0 var(--line); touch-action: none; display: block; }
   .pad .guide { stroke: #e9dccb; stroke-width: .6; stroke-dasharray: 2 2; fill: none; }
+  .pad.tracing .model { stroke: #d8c6aa; stroke-width: 7; }
   .pad .model { stroke: #efe6d8; stroke-width: 5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
   .pad .done-stroke { stroke: #333; stroke-width: 5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
   .pad .ink { stroke: #555; stroke-width: 5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
@@ -79,6 +80,9 @@
   @keyframes blink { from { opacity: 1; } to { opacity: .15; } }
   .tools { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
   .tool { padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); font-size: 16px; font-weight: bold; white-space: nowrap; }
+  .steps { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 8px; color: var(--sub); font-size: 15px; font-weight: bold; }
+  .steps [data-p] { padding: 4px 12px; border-radius: 999px; border: 2px solid var(--line); background: var(--card); }
+  .steps [data-p].on { background: var(--write); border-color: var(--write); color: #fff; }
   .strokecount { text-align: center; color: var(--sub); margin-top: 6px; font-size: 15px; }
 
   /* けっか */
@@ -763,29 +767,50 @@ function renderWriting(e, s, it) {
     <div class="tools"><button class="tool" data-a="hint">💡 ヒント</button><button class="tool" data-a="model">👀 おてほん</button><button class="tool" data-a="giveup">🏳️ わからない</button></div>`;
   const svg = body.querySelector('svg');
   const first = !(card(e.k, 'w')?.box > 0) && !(card(e.k, 'w')?.n > 0);
-  const begin = () => {
+  // 1回目は うすい おてほんを なぞる（れんしゅう）。2回目は 白紙に かく（こちらだけ ずかんの きろくに なる）
+  body.insertAdjacentHTML('afterbegin', '<div class="steps"><span data-p="trace">① なぞる</span><span>→</span><span data-p="blank">② 見ないで かく</span></div>');
+  let phase = 'trace';
+  const showPhase = () => body.querySelectorAll('.steps [data-p]').forEach(x => x.classList.toggle('on', x.dataset.p === phase));
+  const say = (text, cls = '') => { const fb = $('quiz-feedback'); fb.className = 'feedback ' + cls; fb.textContent = text; };
+  const onMiss = other => {
+    say(other ? 'かきじゅんが ちがうよ' : pad.miss >= 2 ? 'ひかっている ところを かこう' : 'もういちど', 'ng');
+    setTimeout(() => { if (!quiz.cur.answered) say(phase === 'trace' ? 'うすい 字を なぞろう' : '見ないで かいてみよう'); }, 1400);
+  };
+  const startBlank = () => {
+    phase = 'blank'; showPhase();
+    svg.classList.remove('tracing');
     pad.setup(svg, e, { interactive: true, onDone: hintUsed => {
       if (quiz.cur.answered) return;
       quiz.cur.answered = true; pad.unbind();
       finishQuestion(hintUsed ? 'hint' : 'ok');
     } });
     pad.countEl = body.querySelector('.strokecount'); pad.updateCount();
-    pad.onMiss = other => {
-      const fb = $('quiz-feedback');
-      fb.className = 'feedback ng';
-      fb.textContent = other ? 'かきじゅんが ちがうよ' : pad.miss >= 2 ? 'ひかっている ところを かこう' : 'もういちど';
-      setTimeout(() => { if (!quiz.cur.answered) fb.textContent = ''; }, 1400);
-    };
+    pad.onMiss = onMiss;
+    say('こんどは 見ないで かいてみよう');
   };
+  const startTrace = () => {
+    phase = 'trace'; showPhase();
+    svg.classList.add('tracing');
+    pad.setup(svg, e, { interactive: true, showModel: true, onDone: () => {
+      pad.unbind();
+      say('じょうず！', 'ok');
+      setTimeout(() => { if (!quiz.cur.answered) startBlank(); }, 700);
+    } });
+    pad.countEl = body.querySelector('.strokecount'); pad.updateCount();
+    pad.onMiss = onMiss;
+    say('うすい 字を なぞろう');
+  };
+  showPhase();
   if (first) {
-    // はじめて かく字は、まず かきじゅんを 見せる（ヒントには ならない）
+    // はじめて かく字は、まず かきじゅんを 見せる
     pad.setup(svg, e, { showModel: true });
-    $('quiz-feedback').className = 'feedback'; $('quiz-feedback').textContent = 'まずは かきじゅんを 見てね';
-    pad.animate(() => { $('quiz-feedback').textContent = 'じぶんで かいてみよう'; begin(); });
-  } else begin();
+    say('まずは かきじゅんを 見てね');
+    pad.animate(startTrace);
+  } else startTrace();
   body.querySelectorAll('.tool').forEach(b => b.addEventListener('click', () => {
     if (quiz.cur.answered) return;
     const a = b.dataset.a;
+    if (phase === 'trace' && a !== 'giveup') { pad.hint(); pad.hintUsed = false; return; }   // なぞる ときの ヒントは きろくに ひびかない
     if (a === 'hint') pad.hint();
     else if (a === 'model') {
       pad.hintUsed = true;
