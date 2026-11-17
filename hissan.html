@@ -14,6 +14,8 @@
             --line: #eadfcd;
             --good: #43a85a;
             --focus: #ffd34d;
+            --op-add: #2f9e5a;
+            --op-sub: #d9536b;
             --mul: #3f8fe0;
             --div: #ee8a3d;
             --c-tateru: #e07b00;
@@ -95,6 +97,19 @@
         .title-hero .art { height: 110px; width: auto; }
         #resume-btn { background: var(--focus); color: var(--ink); box-shadow: 0 6px 0 #d8a91d; }
 
+        .tabs { display: flex; gap: 10px; width: min(100%, 860px); }
+        .tab {
+            flex: 1;
+            font-size: 24px;
+            font-weight: bold;
+            padding: 12px 8px;
+            border-radius: 18px;
+            background: var(--card);
+            color: var(--sub);
+            border: 3px solid var(--line);
+            box-shadow: 0 4px 0 var(--line);
+        }
+        .tab.on { background: var(--ink); color: #fff; border-color: var(--ink); box-shadow: 0 4px 0 #1f1f1f; }
         .levels {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -110,6 +125,8 @@
             border-radius: 18px;
             color: #fff;
         }
+        .op-col.add .op-head { background: var(--op-add); }
+        .op-col.sub .op-head { background: var(--op-sub); }
         .op-col.mul .op-head { background: var(--mul); }
         .op-col.div .op-head { background: var(--div); }
         .level-btn {
@@ -133,6 +150,8 @@
             display: flex; align-items: center; justify-content: center;
             font-size: 30px; font-weight: bold; color: #fff;
         }
+        .op-col.add .num { background: var(--op-add); }
+        .op-col.sub .num { background: var(--op-sub); }
         .op-col.mul .num { background: var(--mul); }
         .op-col.div .num { background: var(--div); }
         .level-btn .txt { display: flex; flex-direction: column; gap: 2px; flex: 1; }
@@ -179,6 +198,8 @@
             border: 4px solid #fff;
             box-shadow: 0 4px 0 var(--line);
         }
+        .stage.add-stage { background: linear-gradient(#fff3b0, #fffbe6 58%, #d8efb8 58%, #bfe39a); }
+        .stage.sub-stage { background: linear-gradient(#ffd6e0, #fff0f4 58%, #e6d9f2 58%, #d3c2ea); }
         .stage.div-stage { background: linear-gradient(#ffd9b8, #fff1e2 58%, #f1dfb6 58%, #e3cb94); }
         .stage.boss-stage { background: linear-gradient(#3b2d5c, #6b4f8f 58%, #4a3a52 58%, #2f2536); }
         .stage.boss-stage .mon-name { color: #fff; }
@@ -283,6 +304,7 @@
         .chip.on[data-label="かける"] { background: var(--c-kakeru); }
         .chip.on[data-label="くりあがり"] { background: var(--c-kakeru); }
         .chip.on[data-label="ひく"] { background: var(--c-hiku); }
+        .chip.on[data-label="くりさがり"] { background: var(--c-hiku); }
         .chip.on[data-label="おろす"] { background: var(--c-orosu); }
         .chip.on[data-label="たす"] { background: var(--c-tasu); }
 
@@ -332,6 +354,15 @@
             border-radius: 0 0 70% 0 / 0 0 40% 0;
         }
         .cell.faint { color: #b8b0a2; }
+        .cell.strike::after {
+            content: '';
+            position: absolute;
+            left: 18%;
+            right: 18%;
+            top: 50%;
+            border-top: 4px solid var(--c-hiku);
+            transform: rotate(-35deg);
+        }
         .cell.trial { color: var(--c-tateru); outline: 3px dashed var(--c-tateru); outline-offset: -6px; }
         .cell.current {
             background: #fff3b8;
@@ -351,7 +382,7 @@
         @keyframes cellpop { 50% { transform: scale(1.35); } }
         .cell[data-l="たてる"] { color: var(--c-tateru); }
         .cell[data-l="かける"], .cell[data-l="くりあがり"] { color: var(--c-kakeru); }
-        .cell[data-l="ひく"] { color: var(--c-hiku); }
+        .cell[data-l="ひく"], .cell[data-l="くりさがり"] { color: var(--c-hiku); }
         .cell[data-l="おろす"] { color: var(--c-orosu); }
         .cell[data-l="たす"] { color: var(--c-tasu); }
 
@@ -471,6 +502,10 @@
         <h1>ひっさん モンスターバトル<small>ひっさんで モンスターを やっつけよう！</small></h1>
         <div class="title-hero" id="title-hero"></div>
         <button class="wide-btn" id="resume-btn" hidden></button>
+        <div class="tabs" id="tabs">
+            <button class="tab" data-tab="addsub">＋ － たしざん・ひきざん</button>
+            <button class="tab" data-tab="muldiv">× ÷ かけざん・わりざん</button>
+        </div>
         <div class="levels" id="levels"></div>
         <div class="title-links">
             <button class="wide-btn sub" id="to-zukan">📖 ずかん</button>
@@ -554,6 +589,18 @@
         const dig = (n, c) => Math.floor(n / Math.pow(10, c)) % 10; // みぎから c ばんめの くらいの かず
 
         const LEVELS = {
+            add: [
+                { lv: 1, title: '2けた ＋ 2けた', sub: 'くりあがり なし', normal: 7 },
+                { lv: 2, title: '2けた ＋ 2けた', sub: 'くりあがり あり', normal: 7 },
+                { lv: 3, title: '3けた ＋ 3けた', sub: 'くりあがり 1〜2かい', normal: 4 },
+                { lv: 4, title: '3〜4けた ＋ 3けた', sub: 'こたえが 4けた', normal: 4 }
+            ],
+            sub: [
+                { lv: 1, title: '2けた － 2けた', sub: 'くりさがり なし', normal: 7 },
+                { lv: 2, title: '2けた － 2けた', sub: 'くりさがり あり', normal: 7 },
+                { lv: 3, title: '3けた － 2〜3けた', sub: 'くりさがり 1〜2かい', normal: 4 },
+                { lv: 4, title: '0の ある かずから', sub: '504－267 など', normal: 4 }
+            ],
             mul: [
                 { lv: 1, title: '2けた × 1けた', sub: 'くりあがり なし', normal: 7 },
                 { lv: 2, title: '2〜3けた × 1けた', sub: 'くりあがり あり', normal: 7 },
@@ -884,9 +931,220 @@
             P.chips = ['たてる', 'かける', 'ひく', 'おろす'];
         }
 
+        // ===== たしざん =====
+        function addCarries(a, b) {
+            const out = [];
+            let c = 0;
+            for (let i = 0; i < Math.max(len(a), len(b)); i++) {
+                const s = dig(a, i) + dig(b, i) + c;
+                c = Math.floor(s / 10);
+                out.push(c);
+            }
+            return out; // それぞれの くらいから 1つ うえへの くりあがり
+        }
+
+        function genAdd(level, boss) {
+            for (let t = 0; t < 20000; t++) {
+                let a, b;
+                if (level <= 2) { a = rand(10, 99); b = rand(10, 99); }
+                else if (level === 3) { a = rand(100, 899); b = rand(100, 899); }
+                else { a = (!boss && Math.random() < 0.35) ? rand(1000, 8999) : rand(100, 999); b = rand(100, 999); }
+                const cs = addCarries(a, b);
+                const n = cs.filter((c) => c > 0).length;
+                const s = a + b;
+                if (level === 1) {
+                    if (n > 0) continue;
+                    if (boss && s < 80) continue;
+                } else if (level === 2) {
+                    if (cs[0] === 0) continue; // 一のくらいで くりあがる
+                    if (boss ? s < 100 : (s >= 100 && Math.random() < 0.7)) continue;
+                } else if (level === 3) {
+                    if (s >= 1000 || n < 1 || n > 2) continue;
+                    if (boss && n < 2) continue;
+                } else {
+                    if (len(s) !== 4 || n < 2) continue;
+                    if (boss && n < 3) continue;
+                }
+                return { a, b };
+            }
+            throw new Error('genAdd failed');
+        }
+
+        function buildAdd(P) {
+            const { a, b, level } = P;
+            const A = len(a), B = len(b), total = a + b, T = len(total);
+            const W = Math.max(A, B + 1, T);
+            const g = newGrid(W, 4);
+            g.rows[0].small = true;
+            for (let i = 0; i < A; i++) g.rows[1].cells[i] = { text: String(dig(a, i)), cls: 'given' };
+            for (let i = 0; i < B; i++) g.rows[2].cells[i] = { text: String(dig(b, i)), cls: 'given' };
+            g.rows[2].cells[W - 1] = { text: '＋', cls: 'sign' };
+            g.rows[2].ul = [0, W - 1];
+            P.grid = g;
+
+            const steps = [];
+            const M = Math.max(A, B);
+            let c = 0;
+            for (let i = 0; i < M; i++) {
+                const x = i < A ? dig(a, i) : null;
+                const y = i < B ? dig(b, i) : null;
+                const s = (x ?? 0) + (y ?? 0) + c;
+                const terms = [x, y].filter((v) => v !== null);
+                const ask = (terms.length === 1 && !c)
+                    ? `${terms[0]}を そのまま おろそう`
+                    : [...terms, ...(c ? [c] : [])].join('＋') + ' は？';
+                const nc = Math.floor(s / 10);
+                const last = i === M - 1;
+                const st = { type: 'digit', row: 3, col: i, answer: s % 10, ask, label: 'たす', real: true };
+                if (!last && nc > 0 && level !== 2) {
+                    st.after = () => setCell(P, 0, i + 1, { text: '1', cls: 'faint' });
+                }
+                steps.push(st);
+                if (!last && nc > 0 && level === 2) {
+                    steps.push({ type: 'digit', row: 0, col: i + 1, answer: 1, label: 'くりあがり', real: true,
+                        ask: `${s}の 10のくらいの 1を ちいさく かこう` });
+                }
+                if (last && nc > 0) {
+                    steps.push({ type: 'digit', row: 3, col: i + 1, answer: 1, label: 'たす', real: true,
+                        ask: 'くりあがりの 1を おろそう' });
+                }
+                c = nc;
+            }
+            P.queue = steps;
+            P.hpTotal = steps.filter((s) => s.real).length;
+            P.answerText = `${total}`;
+            P.speech = `${a} たす ${b}`;
+            P.chips = level === 2 ? ['たす', 'くりあがり'] : ['たす'];
+        }
+
+        // ===== ひきざん =====
+        // ひっさんの すすみかたを さきに しらべる（くりさがりの かず・0を またぐか）
+        function subPlan(a, b) {
+            const A = len(a);
+            const top = String(a).split('').reverse().map(Number);
+            const cols = [];
+            for (let i = 0; i < A; i++) {
+                const y = i < len(b) ? dig(b, i) : null;
+                const col = { i, before: top[i], y, borrow: null };
+                if (y !== null && top[i] < y) {
+                    let j = i + 1;
+                    while (top[j] === 0) j++;
+                    const changes = [{ col: j, from: top[j], to: top[j] - 1 }];
+                    top[j]--;
+                    for (let k = i + 1; k < j; k++) { changes.push({ col: k, from: top[k], to: 9 }); top[k] = 9; }
+                    col.borrow = { from: j, changes, chain: j > i + 1 };
+                    top[i] += 10;
+                }
+                col.x = top[i];
+                col.d = top[i] - (y ?? 0);
+                cols.push(col);
+            }
+            return cols;
+        }
+
+        function genSub(level, boss) {
+            for (let t = 0; t < 20000; t++) {
+                let a, b;
+                if (level <= 2) { a = rand(20, 99); b = rand(10, 98); }
+                else if (level === 3) { a = rand(100, 999); b = (boss || Math.random() < 0.5) ? rand(100, 998) : rand(10, 99); }
+                else {
+                    if (boss || Math.random() < 0.35) {
+                        a = rand(1, 9) * 1000 + rand(0, 99);
+                        if (boss && a % 100 >= 10) continue; // 1003 の ような 0が 2つ ならぶ かず
+                    } else {
+                        a = rand(1, 9) * 100 + rand(0, 9);
+                    }
+                    b = rand(100, 999);
+                }
+                if (a <= b) continue;
+                const cols = subPlan(a, b);
+                const n = cols.filter((c) => c.borrow).length;
+                const chain = cols.some((c) => c.borrow && c.borrow.chain);
+                if (level === 1) {
+                    if (n > 0) continue;
+                    if (a - b < 10 && Math.random() < 0.8) continue;
+                } else if (level === 2) {
+                    if (n !== 1) continue;
+                    if (a - b < 10 && (boss || Math.random() < 0.7)) continue;
+                } else if (level === 3) {
+                    if (chain || n < 1 || n > 2) continue;
+                    if (boss && n < 2) continue;
+                } else {
+                    if (!chain) continue; // ボスは 1003 の ような 0が 2つ ならぶ かず
+                }
+                return { a, b };
+            }
+            throw new Error('genSub failed');
+        }
+
+        function buildSub(P) {
+            const { a, b, level } = P;
+            const A = len(a), B = len(b), diff = a - b, T = len(diff);
+            const W = Math.max(A, B + 1);
+            const g = newGrid(W, 4);
+            g.rows[0].small = true; // くりさがりで へった かずを かく ちいさい だん
+            for (let i = 0; i < A; i++) g.rows[1].cells[i] = { text: String(dig(a, i)), cls: 'given' };
+            for (let i = 0; i < B; i++) g.rows[2].cells[i] = { text: String(dig(b, i)), cls: 'given' };
+            g.rows[2].cells[W - 1] = { text: '－', cls: 'sign' };
+            g.rows[2].ul = [0, W - 1];
+            P.grid = g;
+
+            const strike = (k, from) => setCell(P, 1, k, { text: String(from), cls: 'given strike' });
+            const steps = [];
+            subPlan(a, b).forEach((col) => {
+                const { i, y, borrow } = col;
+                if (borrow) {
+                    const first = borrow.changes[0];
+                    const xo = col.x - 10;
+                    if (level === 2) {
+                        steps.push({ type: 'action', run: async () => {
+                            UI.say(`${xo}から ${y}は ひけないね。となりから 10 かりよう`);
+                            strike(first.col, first.from);
+                            await UI.pause(1300);
+                        } });
+                        steps.push({ type: 'digit', row: 0, col: first.col, answer: first.to, label: 'くりさがり', real: true,
+                            ask: `10 かしたので、${first.from}から 1 へるね。${first.from}－1 は？` });
+                    } else {
+                        steps.push({ type: 'action', run: async () => {
+                            UI.say(borrow.chain
+                                ? `${xo}から ${y}は ひけないね。となりが 0なので、もっと となりから 10 かりるよ`
+                                : `${xo}から ${y}は ひけないね。となりから 10 かりるよ`);
+                            // とおい くらいから じゅんばんに かりてくる
+                            for (const ch of borrow.changes) {
+                                strike(ch.col, ch.from);
+                                setCell(P, 0, ch.col, { text: String(ch.to), cls: 'faint' });
+                                await UI.pause(500);
+                            }
+                            await UI.pause(900);
+                        } });
+                    }
+                }
+                if (i >= T) { // いちばん うえの 0は かかない
+                    steps.push({ type: 'action', run: async () => {
+                        UI.say(y !== null ? `${col.x}－${y}＝0。いちばん うえの 0は かかないよ` : 'のこりは 0。いちばん うえの 0は かかないよ');
+                        await UI.pause(1300);
+                    } });
+                    return;
+                }
+                const ask = y === null ? `${col.x}を そのまま おろそう` : `${col.x}－${y} は？`;
+                steps.push({ type: 'digit', row: 3, col: i, answer: col.d, ask, label: 'ひく', real: true });
+            });
+            P.queue = steps;
+            P.hpTotal = steps.filter((s) => s.real).length;
+            P.answerText = `${diff}`;
+            P.speech = `${a} ひく ${b}`;
+            P.chips = level === 2 ? ['くりさがり', 'ひく'] : ['ひく'];
+        }
+
         function makeProblem(op, level, boss) {
             const P = { op, level, boss };
-            if (op === 'mul') {
+            if (op === 'add') {
+                Object.assign(P, genAdd(level, boss));
+                buildAdd(P);
+            } else if (op === 'sub') {
+                Object.assign(P, genSub(level, boss));
+                buildSub(P);
+            } else if (op === 'mul') {
                 Object.assign(P, genMul(level, boss));
                 buildMul(P);
             } else {
@@ -992,7 +1250,7 @@
             return text
                 .replace(/×/g, ' かける ')
                 .replace(/÷/g, ' わる ')
-                .replace(/－/g, ' ひく ')
+                .replace(/[－−]/g, ' ひく ')
                 .replace(/＋/g, ' たす ')
                 .replace(/＝/g, ' は ')
                 .replace(/[？?！!]/g, '')
@@ -1019,7 +1277,11 @@
         updateSoundButtons();
 
         // ===== モンスター =====
-        const KEYS = ['mul1', 'mul2', 'mul3', 'mul4', 'div1', 'div2', 'div3', 'div4'];
+        // あとから たした ものは うしろに つなぐ（まえの モンスターの みためが かわらないように）
+        const KEYS = ['mul1', 'mul2', 'mul3', 'mul4', 'div1', 'div2', 'div3', 'div4',
+            'add1', 'add2', 'add3', 'add4', 'sub1', 'sub2', 'sub3', 'sub4'];
+        const ZUKAN_ORDER = ['add1', 'add2', 'add3', 'add4', 'sub1', 'sub2', 'sub3', 'sub4',
+            'mul1', 'mul2', 'mul3', 'mul4', 'div1', 'div2', 'div3', 'div4'];
         const NAMES = {
             mul1: ['ポヨリン', 'ちびトゲ', 'まるもち', 'ぷかぷか', 'キング ポヨリン'],
             mul2: ['くりあげドリ', 'ピョンかに', 'モコだま', 'ぐるぐる', 'だいおう くりあげドリ'],
@@ -1028,9 +1290,18 @@
             div1: ['わけわけ', 'ポテまる', 'チョコン', 'ペタペタ', 'わけわけ キング'],
             div2: ['あまりん', 'ふわゴースト', 'トゲまる', 'クルリン', 'あまりん だいおう'],
             div3: ['ほのおトカ', 'ぼうぼう', 'ガルガル', 'ひとつめ', 'ほのお ドラゴ'],
-            div4: ['ナオース', 'ピカピカ', 'ドロン', 'きらぼし', 'だいまおう ナオース']
+            div4: ['ナオース', 'ピカピカ', 'ドロン', 'きらぼし', 'だいまおう ナオース'],
+            add1: ['ピョコたん', 'まめっち', 'コロン', 'プチふわ', 'キング ピョコたん'],
+            add2: ['くりくり', 'ぴょんだま', 'ニコまる', 'ころころ', 'だいおう くりくり'],
+            add3: ['モリモリ', 'ぺたんこ', 'つのっぴ', 'ふわりん', 'モリモリ ジェネラル'],
+            add4: ['ドッスン', 'ギラギラ', 'ほしまる', 'ガブリン', 'まおう ドッスン'],
+            sub1: ['ヘラヘラ', 'ちょろまる', 'ぷにぷに', 'ミニゴン', 'キング ヘラヘラ'],
+            sub2: ['カリカリ', 'ぽんぽこ', 'ツンツン', 'ゆきだま', 'だいおう カリカリ'],
+            sub3: ['ヒキーラ', 'もくもく', 'バサバサ', 'ねむねむ', 'ヒキーラ ジェネラル'],
+            sub4: ['ゼロン', 'かげぼうし', 'ドロドロ', 'ビリビリ', 'だいまおう ゼロン']
         };
-        const HUES = { mul1: 120, mul2: 172, mul3: 212, mul4: 262, div1: 28, div2: 48, div3: 4, div4: 322 };
+        const HUES = { mul1: 120, mul2: 172, mul3: 212, mul4: 262, div1: 28, div2: 48, div3: 4, div4: 322,
+            add1: 58, add2: 88, add3: 190, add4: 284, sub1: 338, sub2: 300, sub3: 236, sub4: 145 };
         const SHAPES = ['blob', 'round', 'ghost', 'block', 'tall'];
         const HORNS = ['none', 'two', 'ears', 'one', 'antenna'];
         const MOUTHS = ['smile', 'fang', 'o', 'zig'];
@@ -1169,17 +1440,28 @@
         }
 
         const levelKey = (op, lv) => `${op}${lv}`;
-        const opMark = (op) => (op === 'mul' ? '×' : '÷');
+        const OPS = {
+            add: { mark: '＋', name: 'たしざん' },
+            sub: { mark: '－', name: 'ひきざん' },
+            mul: { mark: '×', name: 'かけざん' },
+            div: { mark: '÷', name: 'わりざん' }
+        };
+        const TABS = { addsub: ['add', 'sub'], muldiv: ['mul', 'div'] };
+        const opMark = (op) => OPS[op].mark;
         const circled = (n) => '①②③④'[n - 1];
 
         function renderTitle() {
             $('title-hero').innerHTML = heroArt(heroLevel(save.xp));
+            const p = store.get(PROGRESS_KEY, null);
+            let tab = store.get('hissan_tab', null);
+            if (!TABS[tab]) tab = p && TABS.muldiv.includes(p.op) ? 'muldiv' : 'addsub';
+            document.querySelectorAll('#tabs .tab').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
             const wrap = $('levels');
             wrap.innerHTML = '';
-            ['mul', 'div'].forEach((op) => {
+            TABS[tab].forEach((op) => {
                 const col = document.createElement('div');
                 col.className = `op-col ${op}`;
-                col.innerHTML = `<div class="op-head">${op === 'mul' ? 'かけざん ×' : 'わりざん ÷'}</div>`;
+                col.innerHTML = `<div class="op-head">${OPS[op].name} ${OPS[op].mark}</div>`;
                 LEVELS[op].forEach((L) => {
                     const b = document.createElement('button');
                     b.className = 'level-btn';
@@ -1190,7 +1472,6 @@
                 });
                 wrap.appendChild(col);
             });
-            const p = store.get(PROGRESS_KEY, null);
             const btn = $('resume-btn');
             if (p && LEVELS[p.op] && p.index > 0) {
                 const L = LEVELS[p.op][p.level - 1];
@@ -1205,6 +1486,10 @@
             const p = store.get(PROGRESS_KEY, null);
             if (p) startRound(p.op, p.level, p);
         });
+        document.querySelectorAll('#tabs .tab').forEach((b) => onTap(b, () => {
+            store.set('hissan_tab', b.dataset.tab);
+            renderTitle();
+        }));
         $('to-zukan').addEventListener('click', () => show('zukan'));
         $('to-hero').addEventListener('click', () => show('hero'));
         document.querySelectorAll('.back-btn').forEach((b) => b.addEventListener('click', () => show('title')));
@@ -1278,7 +1563,7 @@
             state.busy = false;
 
             renderDots();
-            $('stage').className = 'stage' + (R.op === 'div' ? ' div-stage' : '') + (boss ? ' boss-stage' : '');
+            $('stage').className = 'stage' + (R.op !== 'mul' ? ` ${R.op}-stage` : '') + (boss ? ' boss-stage' : '');
             $('hero-wrap').innerHTML = heroArt(heroLevel(save.xp));
             const mon = $('monster');
             mon.className = (boss ? 'boss ' : '') + 'appear';
@@ -1292,7 +1577,7 @@
             showPad();
 
             const first = boss ? `ボスの ${P.monster.name}が あらわれた！` : `${P.monster.name}が あらわれた！`;
-            say(first + ' ' + P.speech.replace(' かける ', ' × ').replace(' わる ', ' ÷ '));
+            say(first + ' ' + P.speech.replace(' かける ', ' × ').replace(' わる ', ' ÷ ').replace(' たす ', ' ＋ ').replace(' ひく ', ' － '));
             if (boss) {
                 sfx.boss();
                 $('battle').classList.add('shake-screen');
@@ -1716,11 +2001,11 @@
             $('zukan-title').textContent = `ずかん　${got} / ${MONSTERS.length}`;
             const grid = $('zukan-grid');
             grid.innerHTML = '';
-            KEYS.forEach((key) => {
+            ZUKAN_ORDER.forEach((key) => {
                 const op = key.slice(0, 3), lv = Number(key[3]);
                 const sec = document.createElement('div');
                 sec.className = 'zsection';
-                sec.textContent = `${op === 'mul' ? 'かけざん' : 'わりざん'} ${circled(lv)}　${LEVELS[op][lv - 1].title}`;
+                sec.textContent = `${OPS[op].name} ${circled(lv)}　${LEVELS[op][lv - 1].title}`;
                 grid.appendChild(sec);
                 MONSTERS.filter((m) => m.key === key).forEach((m) => {
                     const n = save.zukan[m.id] || 0;
@@ -1742,7 +2027,7 @@
             const pct = Math.round(100 * (save.xp - cur) / (nxt - cur));
             const nextTier = TIERS[ti + 1];
             const recs = [];
-            KEYS.forEach((key) => {
+            ZUKAN_ORDER.forEach((key) => {
                 const b = save.best[key];
                 if (b) recs.push(`${opMark(key.slice(0, 3))}${circled(Number(key[3]))}　🔥${b.combo} コンボ　⏱️${fmtTime(b.time)}`);
             });

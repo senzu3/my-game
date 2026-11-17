@@ -1,4 +1,4 @@
-# ひっさん モンスターバトル: モンスター40体と勇者5段階を Blender で組み立てて img/ に書き出す
+# ひっさん モンスターバトル: モンスター80体と勇者5段階を Blender で組み立てて img/ に書き出す
 #
 # つかいかた（Blender の Python コンソールなどで）:
 #   ns = {'__file__': '/path/to/my-game/tools/make_characters.py'}
@@ -13,8 +13,10 @@ from mathutils import Vector, Quaternion
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'img')
 SCENE = 'hissan_chars'
 
-KEYS = ['mul1', 'mul2', 'mul3', 'mul4', 'div1', 'div2', 'div3', 'div4']
-HUES = {'mul1': 120, 'mul2': 172, 'mul3': 212, 'mul4': 262, 'div1': 28, 'div2': 48, 'div3': 4, 'div4': 322}
+KEYS = ['mul1', 'mul2', 'mul3', 'mul4', 'div1', 'div2', 'div3', 'div4',
+        'add1', 'add2', 'add3', 'add4', 'sub1', 'sub2', 'sub3', 'sub4']
+HUES = {'mul1': 120, 'mul2': 172, 'mul3': 212, 'mul4': 262, 'div1': 28, 'div2': 48, 'div3': 4, 'div4': 322,
+        'add1': 58, 'add2': 88, 'add3': 190, 'add4': 284, 'sub1': 338, 'sub2': 300, 'sub3': 236, 'sub4': 145}
 SHAPES = ['blob', 'round', 'ghost', 'block', 'tall']
 HORNS = ['none', 'two', 'ears', 'one', 'antenna']
 MOUTHS = ['smile', 'fang', 'o', 'zig']
