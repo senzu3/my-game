@@ -354,6 +354,18 @@
             border-radius: 0 0 70% 0 / 0 0 40% 0;
         }
         .cell.faint { color: #b8b0a2; }
+        .cell.gets10::before {
+            content: '10';
+            position: absolute;
+            left: -2%;
+            top: -4%;
+            font-size: calc(var(--cell) * 0.3);
+            line-height: 1;
+            color: #fff;
+            background: var(--c-hiku);
+            border-radius: 8px;
+            padding: 2px 4px;
+        }
         .cell.strike::after {
             content: '';
             position: absolute;
@@ -492,6 +504,67 @@
         .xpbar { height: 24px; border-radius: 12px; background: var(--line); overflow: hidden; }
         .xpbar > div { height: 100%; background: linear-gradient(90deg, #ffd34d, #ff9f1c); }
         .hero-info .records { font-size: 19px; background: var(--card); border: 3px solid var(--line); border-radius: 16px; padding: 10px 14px; line-height: 1.6; }
+        /* ===== スマホ（たて）：もじを ちいさく、モンスターを おおきく ===== */
+        @media (max-width: 600px) {
+            .screen { padding: 10px; }
+            .icon-btn { min-width: 50px; height: 50px; font-size: 24px; border-radius: 16px; }
+            #title { gap: 10px; }
+            #title h1 { font-size: 26px; padding: 0 56px; word-break: keep-all; }
+            #title .corner { top: 10px; right: 10px; }
+            .title-hero, .title-hero .art { height: 84px; }
+            .wide-btn { min-height: 58px; font-size: 22px; padding: 0 20px; }
+            .tabs { gap: 8px; }
+            .tab { font-size: 16px; padding: 8px 4px; border-radius: 14px; word-break: keep-all; line-height: 1.35; }
+            .levels { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+            .op-col { gap: 8px; }
+            .op-head { font-size: 22px; padding: 4px; border-radius: 14px; }
+            .level-btn { min-height: 64px; padding: 8px 12px; gap: 10px; border-radius: 18px; }
+            .level-btn .num { width: 40px; height: 40px; font-size: 24px; }
+            .level-btn .t1 { font-size: 20px; }
+            .level-btn .t2 { font-size: 14px; }
+            .level-btn .crown { font-size: 26px; }
+
+            .topbar { gap: 8px; }
+            .dot { width: 18px; height: 18px; }
+            .battle-main { gap: 8px; grid-template-rows: minmax(250px, 45%) minmax(0, 1fr); }
+            .stage { border-radius: 20px; border-width: 3px; }
+            .mon-head { padding: 6px 10px 0; gap: 2px; }
+            .mon-name { font-size: 17px; }
+            .hp { height: 14px; }
+            .combo { font-size: 16px; top: 6px; right: 8px; padding: 2px 8px; }
+            #monster, #monster.boss { height: 100%; max-height: none; }
+            .hero-wrap { height: 26%; max-height: 80px; left: 4px; bottom: 4px; }
+            .bubble { margin: 0 6px 6px; margin-left: 64px; min-height: 0; padding: 6px 10px; font-size: 15px; line-height: 1.3; border-radius: 14px; }
+            .work { gap: 6px; }
+            .chip { font-size: 15px; padding: 3px 10px; border-width: 2px; }
+            .board { border-radius: 18px; }
+            .guide { min-height: 0; font-size: 17px; gap: 6px; }
+            .guide .tag { font-size: 13px; padding: 1px 8px; }
+            .pad { gap: 6px; }
+            .pad button { height: 54px; font-size: 30px; border-radius: 14px; }
+            .action-area { min-height: 114px; }
+            .action-area .wide-btn { font-size: 24px; min-height: 72px; padding: 0 28px; }
+        }
+        /* ===== スマホ（よこ）：たかさが すくないとき ===== */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .screen { padding: 8px; }
+            .icon-btn { min-width: 46px; height: 46px; font-size: 22px; border-radius: 14px; }
+            .battle-main { gap: 8px; }
+            .mon-head { padding: 4px 10px 0; gap: 2px; }
+            .mon-name { font-size: 16px; }
+            .hp { height: 12px; }
+            #monster, #monster.boss { height: 100%; max-height: none; }
+            .hero-wrap { height: 30%; max-height: 70px; }
+            .bubble { margin: 0 6px 6px; margin-left: 60px; min-height: 0; padding: 4px 10px; font-size: 14px; }
+            .work { gap: 4px; }
+            .chip { font-size: 14px; padding: 2px 8px; }
+            .guide { min-height: 0; font-size: 15px; }
+            .guide .tag { font-size: 12px; }
+            .pad { gap: 4px; grid-template-columns: repeat(10, 1fr); }
+            .pad button { height: 48px; font-size: 26px; border-radius: 12px; }
+            .action-area { min-height: 60px; }
+            .action-area .wide-btn { font-size: 22px; min-height: 56px; }
+        }
     </style>
 </head>
 <body>
@@ -973,7 +1046,7 @@
         function buildAdd(P) {
             const { a, b, level } = P;
             const A = len(a), B = len(b), total = a + b, T = len(total);
-            const W = Math.max(A, B + 1, T);
+            const W = Math.max(A, B, T) + 1; // ＋は かずの ない いちばん ひだりの れつに かく
             const g = newGrid(W, 4);
             g.rows[0].small = true;
             for (let i = 0; i < A; i++) g.rows[1].cells[i] = { text: String(dig(a, i)), cls: 'given' };
@@ -1080,7 +1153,7 @@
         function buildSub(P) {
             const { a, b, level } = P;
             const A = len(a), B = len(b), diff = a - b, T = len(diff);
-            const W = Math.max(A, B + 1);
+            const W = Math.max(A, B) + 1; // －は かずの ない いちばん ひだりの れつに かく
             const g = newGrid(W, 4);
             g.rows[0].small = true; // くりさがりで へった かずを かく ちいさい だん
             for (let i = 0; i < A; i++) g.rows[1].cells[i] = { text: String(dig(a, i)), cls: 'given' };
@@ -1089,7 +1162,19 @@
             g.rows[2].ul = [0, W - 1];
             P.grid = g;
 
-            const strike = (k, from) => setCell(P, 1, k, { text: String(from), cls: 'given strike' });
+            const topCell = (k) => P.grid.rows[1].cells[k];
+            const strike = (k, from) => {
+                const ten = topCell(k).cls.includes('gets10') ? ' gets10' : '';
+                setCell(P, 1, k, { text: String(from), cls: 'given strike' + ten });
+            };
+            // さいしょの 2もん（P.help）は「10 もらった」しるしを つけて、よみあげも する
+            const showTen = async (k, msg) => {
+                UI.say(msg);
+                if (!P.help) return;
+                const c = topCell(k);
+                setCell(P, 1, k, { text: c.text, cls: c.cls + ' gets10' });
+                if (UI.speak) UI.speak(msg);
+            };
             const steps = [];
             subPlan(a, b).forEach((col) => {
                 const { i, y, borrow } = col;
@@ -1098,24 +1183,24 @@
                     const xo = col.x - 10;
                     if (level === 2) {
                         steps.push({ type: 'action', run: async () => {
-                            UI.say(`${xo}から ${y}は ひけないね。となりから 10 かりよう`);
                             strike(first.col, first.from);
-                            await UI.pause(1300);
+                            await showTen(i, `${xo}から ${y}は ひけないね。となりから 10 もらおう`);
+                            await UI.pause(P.help ? 2600 : 1300);
                         } });
-                        steps.push({ type: 'digit', row: 0, col: first.col, answer: first.to, label: 'くりさがり', real: true,
-                            ask: `10 かしたので、${first.from}から 1 へるね。${first.from}－1 は？` });
+                        steps.push({ type: 'digit', row: 0, col: first.col, answer: first.to, label: 'くりさがり', real: true, help: true,
+                            ask: `10 あげたので、${first.from}は 1 へるね。${first.from}－1 は？` });
                     } else {
                         steps.push({ type: 'action', run: async () => {
-                            UI.say(borrow.chain
-                                ? `${xo}から ${y}は ひけないね。となりが 0なので、もっと となりから 10 かりるよ`
-                                : `${xo}から ${y}は ひけないね。となりから 10 かりるよ`);
+                            await showTen(i, borrow.chain
+                                ? `${xo}から ${y}は ひけないね。となりが 0なので、もっと となりから 10 もらうよ`
+                                : `${xo}から ${y}は ひけないね。となりから 10 もらうよ`);
                             // とおい くらいから じゅんばんに かりてくる
                             for (const ch of borrow.changes) {
                                 strike(ch.col, ch.from);
                                 setCell(P, 0, ch.col, { text: String(ch.to), cls: 'faint' });
                                 await UI.pause(500);
                             }
-                            await UI.pause(900);
+                            await UI.pause(P.help ? 2200 : 900);
                         } });
                     }
                 }
@@ -1126,8 +1211,9 @@
                     } });
                     return;
                 }
-                const ask = y === null ? `${col.x}を そのまま おろそう` : `${col.x}－${y} は？`;
-                steps.push({ type: 'digit', row: 3, col: i, answer: col.d, ask, label: 'ひく', real: true });
+                const ask = y === null ? `${col.x}を そのまま おろそう`
+                    : borrow ? `10 もらって ${col.x}。${col.x}－${y} は？` : `${col.x}－${y} は？`;
+                steps.push({ type: 'digit', row: 3, col: i, answer: col.d, ask, label: 'ひく', real: true, help: !!borrow });
             });
             P.queue = steps;
             P.hpTotal = steps.filter((s) => s.real).length;
@@ -1558,6 +1644,7 @@
             const boss = R.index === L.normal;
             const key = levelKey(R.op, R.level);
             const P = makeProblem(R.op, R.level, boss);
+            P.help = R.index < 2;
             P.monster = monsterDef(key, boss ? 4 : Math.floor(Math.random() * 4));
             state.P = P;
             state.busy = false;
@@ -1639,6 +1726,7 @@
         const UI = {
             cellChanged: (r, c) => paintCell(r, c),
             say: (t) => say(t),
+            speak: (t) => speak(t),
             pause: (ms) => wait(ms),
             hpChanged: () => updateHP(),
             trialCheck: async (P, s, v, big) => {
@@ -1723,7 +1811,8 @@
             const g = $('guide');
             g.className = 'guide';
             if (!st) { g.textContent = ''; return; }
-            const always = P.level <= 2; // ①②は いつも ヒントを だしておく
+            // ①②は いつも ヒントを だしておく。くりさがりは さいしょの 2もんだけ どの レベルでも だす
+            const always = P.level <= 2 || (P.help && st.help);
             if (st.misses >= 3) {
                 g.className = 'guide strong';
                 g.innerHTML = `<span class="tag">ヒント</span> ${st.ask}　こたえは ${st.answer}`;
