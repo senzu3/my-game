@@ -355,16 +355,17 @@
         }
         .cell.faint { color: #b8b0a2; }
         .cell.gets10::before {
-            content: '10';
+            content: attr(data-ten);
             position: absolute;
-            left: -2%;
-            top: -4%;
-            font-size: calc(var(--cell) * 0.3);
+            inset: 4% 10%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: calc(var(--cell) * 0.36);
             line-height: 1;
             color: #fff;
             background: var(--c-hiku);
-            border-radius: 8px;
-            padding: 2px 4px;
+            border-radius: 999px;
         }
         .cell.strike::after {
             content: '';
@@ -1162,17 +1163,16 @@
             g.rows[2].ul = [0, W - 1];
             P.grid = g;
 
-            const topCell = (k) => P.grid.rows[1].cells[k];
-            const strike = (k, from) => {
-                const ten = topCell(k).cls.includes('gets10') ? ' gets10' : '';
-                setCell(P, 1, k, { text: String(from), cls: 'given strike' + ten });
-            };
+            const strike = (k, from) => setCell(P, 1, k, { text: String(from), cls: 'given strike' });
             // さいしょの 2もん（P.help）は「10 もらった」しるしを つけて、よみあげも する
             const showTen = async (k, msg) => {
                 UI.say(msg);
                 if (!P.help) return;
-                const c = topCell(k);
-                setCell(P, 1, k, { text: c.text, cls: c.cls + ' gets10' });
+                // かずの うえの ちいさい だんに「10」を かく（かずには かさねない）。
+                // そこに へった かず（0 など）が もう あれば、10 たした かずを みせる
+                const c = P.grid.rows[0].cells[k];
+                const had = c && c.text !== '' ? Number(c.text) : null;
+                setCell(P, 0, k, { text: c ? c.text : '', cls: (c ? c.cls : '') + ' gets10', ten: String(had === null ? 10 : had + 10) });
                 if (UI.speak) UI.speak(msg);
             };
             const steps = [];
@@ -1709,6 +1709,7 @@
             el.className = cls;
             el.textContent = cell ? cell.text : '';
             if (cell && cell.label) el.dataset.l = cell.label; else delete el.dataset.l;
+            if (cell && cell.ten) el.dataset.ten = cell.ten; else delete el.dataset.ten;
             delete el.dataset.hint;
         }
 
